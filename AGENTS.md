@@ -1,4 +1,4 @@
-# @swarmify/agents-mcp
+# `@swarmify/agents-mcp`
 
 MCP server enabling SubAgents and Swarms for any MCP client. Any client (Claude, Codex, Gemini) can spawn any agent CLI.
 
@@ -450,7 +450,7 @@ Located at `~/.agents/swarm/cache.json`:
 
 If version is outdated, `buildVersionNotice()` appends message to tool descriptions:
 ```
-[New version available: 0.2.7, you are running 0.2.6. Run 'npx -y @swarmify/agents-mcp@latest' to update.]
+[New version available: 0.2.7, you are running 0.2.6. Run `npx -y @swarmify/agents-mcp@latest` to update.]
 ```
 
 ### Client Detection
