@@ -1,0 +1,54 @@
+{
+  "name": "@metyatech/agents-mcp",
+  "version": "0.2.12",
+  "description": "True multi-agent coding in your IDE. Spawn Claude, Codex, Gemini, and Cursor agents from a single MCP server.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "agents-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/metyatech/agents-mcp.git"
+  },
+  "homepage": "https://github.com/metyatech/agents-mcp",
+  "bugs": {
+    "url": "https://github.com/metyatech/agents-mcp/issues"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build",
+    "prepublishOnly": "tsc",
+    "start": "node dist/index.js",
+    "test": "bun test",
+    "hello": "bun run src/hello.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "typescript": "^5.3.0"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai-agents",
+    "multi-agent",
+    "claude-code",
+    "codex",
+    "gemini-cli",
+    "cursor",
+    "orchestration",
+    "swarm"
+  ],
+  "author": "Swarmify <dev@swarmify.co>",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}
