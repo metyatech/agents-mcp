@@ -22,7 +22,7 @@ describe('computePathLCA', () => {
   });
 
   test('returns the path itself for single path', () => {
-    expect(computePathLCA(['/Users/test/project'])).toBe('/Users/test/project');
+    expect(computePathLCA(['/Users/test/project'])).toBe(path.resolve('/Users/test/project'));
   });
 
   test('finds LCA for paths with common ancestor', () => {
@@ -31,7 +31,7 @@ describe('computePathLCA', () => {
       '/Users/test/monorepo/packages/b',
       '/Users/test/monorepo/packages/c',
     ];
-    expect(computePathLCA(paths)).toBe('/Users/test/monorepo/packages');
+    expect(computePathLCA(paths)).toBe(path.resolve('/Users/test/monorepo/packages'));
   });
 
   test('finds LCA at root level for divergent paths', () => {
@@ -39,7 +39,7 @@ describe('computePathLCA', () => {
       '/Users/test/project-a/src',
       '/Users/test/project-b/src',
     ];
-    expect(computePathLCA(paths)).toBe('/Users/test');
+    expect(computePathLCA(paths)).toBe(path.resolve('/Users/test'));
   });
 
   test('returns null for paths with no common segments', () => {
@@ -58,7 +58,7 @@ describe('computePathLCA', () => {
       '/a/b/c/d',
       '/a/b/c',
     ];
-    expect(computePathLCA(paths)).toBe('/a/b/c');
+    expect(computePathLCA(paths)).toBe(path.resolve('/a/b/c'));
   });
 
   test('filters out empty paths', () => {
@@ -68,7 +68,7 @@ describe('computePathLCA', () => {
       '  ',
       '/Users/test/project/src',
     ];
-    expect(computePathLCA(paths)).toBe('/Users/test/project');
+    expect(computePathLCA(paths)).toBe(path.resolve('/Users/test/project'));
   });
 
   test('returns null when all paths are empty', () => {
@@ -403,7 +403,7 @@ describe('Effort Model Mapping', () => {
   });
 
   test('should have correct fast effort models', () => {
-    expect(EFFORT_MODEL_MAP.fast.codex).toBe('gpt-4o-mini');
+    expect(EFFORT_MODEL_MAP.fast.codex).toBe('gpt-5.1-codex-mini');
     expect(EFFORT_MODEL_MAP.fast.gemini).toBe('gemini-3-flash-preview');
     expect(EFFORT_MODEL_MAP.fast.claude).toBe('claude-haiku-4-5-20251001');
     expect(EFFORT_MODEL_MAP.fast.cursor).toBe('composer-1');
@@ -412,14 +412,14 @@ describe('Effort Model Mapping', () => {
   test('should have correct default effort models', () => {
     expect(EFFORT_MODEL_MAP.default.codex).toBe('gpt-5.2-codex');
     expect(EFFORT_MODEL_MAP.default.gemini).toBe('gemini-3-flash-preview');
-    expect(EFFORT_MODEL_MAP.default.claude).toBe('claude-sonnet-4-5');
+    expect(EFFORT_MODEL_MAP.default.claude).toBe('claude-sonnet-4-6');
     expect(EFFORT_MODEL_MAP.default.cursor).toBe('composer-1');
   });
 
   test('should have correct detailed effort models', () => {
-    expect(EFFORT_MODEL_MAP.detailed.codex).toBe('gpt-5.1-codex-max');
+    expect(EFFORT_MODEL_MAP.detailed.codex).toBe('gpt-5.3-codex');
     expect(EFFORT_MODEL_MAP.detailed.gemini).toBe('gemini-3-pro-preview');
-    expect(EFFORT_MODEL_MAP.detailed.claude).toBe('claude-opus-4-5');
+    expect(EFFORT_MODEL_MAP.detailed.claude).toBe('claude-opus-4-6');
     expect(EFFORT_MODEL_MAP.detailed.cursor).toBe('composer-1');
   });
 
@@ -442,7 +442,7 @@ describe('Effort Model Overrides', () => {
 
     expect(resolved.fast.codex).toBe('gpt-5.2-codex-mini');
     expect(resolved.default.codex).toBe('gpt-5.2-codex');
-    expect(resolved.detailed.codex).toBe('gpt-5.1-codex-max');
+    expect(resolved.detailed.codex).toBe('gpt-5.3-codex');
   });
 
   test('should apply multiple level overrides for one agent', () => {
@@ -477,7 +477,7 @@ describe('Effort Model Overrides', () => {
 
     const resolved = resolveEffortModelMap(EFFORT_MODEL_MAP, overrides);
 
-    expect(resolved.fast.codex).toBe('gpt-4o-mini');
+    expect(resolved.fast.codex).toBe('gpt-5.1-codex-mini');
     expect(resolved.fast.gemini).toBe('gemini-3-flash-preview');
     expect(resolved.fast.claude).toBe('claude-haiku-4-5-20251001');
     expect(resolved.fast.cursor).toBe('composer-1');

@@ -14,35 +14,34 @@ import { normalizeEvents, AgentType } from './parsers.js';
 export function computePathLCA(paths: string[]): string | null {
   const validPaths = paths.filter(p => p && p.trim());
   if (validPaths.length === 0) return null;
-  if (validPaths.length === 1) return validPaths[0];
+  if (validPaths.length === 1) return path.resolve(validPaths[0]);
 
-  // Normalize and split all paths into segments
-  const splitPaths = validPaths.map(p => {
-    const normalized = path.resolve(p);
-    // Split by path separator, filter empty segments
-    return normalized.split(path.sep).filter(seg => seg);
+  const resolved = validPaths.map(p => path.resolve(p));
+  const parsed = resolved.map(p => {
+    const root = path.parse(p).root;
+    const rest = p.slice(root.length);
+    const parts = rest.split(path.sep).filter(Boolean);
+    return { root, parts };
   });
 
-  // Find minimum length
-  const minLen = Math.min(...splitPaths.map(p => p.length));
+  const normalizeRoot = (r: string) => (process.platform === 'win32' ? r.toLowerCase() : r);
+  const root0 = parsed[0].root;
+  const sameRoot = parsed.every(p => normalizeRoot(p.root) === normalizeRoot(root0));
+  if (!sameRoot) return null;
 
-  // Find common prefix
-  const commonSegments: string[] = [];
+  const minLen = Math.min(...parsed.map(p => p.parts.length));
+  const commonParts: string[] = [];
   for (let i = 0; i < minLen; i++) {
-    const segment = splitPaths[0][i];
-    const allMatch = splitPaths.every(p => p[i] === segment);
-    if (allMatch) {
-      commonSegments.push(segment);
-    } else {
-      break;
-    }
+    const segment = parsed[0].parts[i];
+    const allMatch = parsed.every(p => p.parts[i] === segment);
+    if (!allMatch) break;
+    commonParts.push(segment);
   }
 
-  if (commonSegments.length === 0) return null;
+  // If the only shared ancestor is the filesystem root, treat it as "no common ancestor".
+  if (commonParts.length === 0) return null;
 
-  // Reconstruct path (add leading separator for absolute paths)
-  const lca = path.sep + commonSegments.join(path.sep);
-  return lca;
+  return path.join(root0, ...commonParts);
 }
 
 export enum AgentStatus {
@@ -53,6 +52,61 @@ export enum AgentStatus {
 }
 
 export type { AgentType } from './parsers.js';
+
+export function buildWindowsSpawnPs1(cmd: string[], stdoutPath: string, workingDirectory: string): string {
+  // In PowerShell single-quoted strings, only ' needs escaping (doubled: '').
+  // Backslashes are literal, so Windows paths need no extra escaping.
+  const psEsc = (s: string) => s.replace(/'/g, "''");
+  const toB64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
+
+  // IMPORTANT: do not embed raw argument text directly in '...' because PowerShell
+  // treats smart quotes (e.g. U+2019 RIGHT SINGLE QUOTATION MARK) as quote tokens,
+  // which can break parsing and cause the wrapper script to fail immediately.
+  // Base64 encode each argument and decode it inside PowerShell.
+  const argListLines = cmd.slice(1).map(a => {
+    const b64 = toB64(a);
+    return `$psi.ArgumentList.Add($enc.GetString([System.Convert]::FromBase64String('${b64}')))`;
+  });
+
+  const psLines = [
+    `$env:CLAUDECODE = $null`,
+    `$enc = [System.Text.UTF8Encoding]::new($false)`,
+    // Resolve the command to its full path so we can handle .ps1/.cmd/.bat wrappers.
+    // npm installs many CLIs as .ps1 scripts (e.g. codex.ps1, gemini.ps1).
+    // ProcessStartInfo with UseShellExecute=false cannot launch .ps1 files directly.
+    `$resolved = Get-Command '${psEsc(cmd[0])}' -ErrorAction SilentlyContinue`,
+    `if ($null -eq $resolved) { [System.IO.File]::WriteAllText('${psEsc(stdoutPath)}', "ERROR: '${psEsc(cmd[0])}' not found in PATH", $enc); exit 1 }`,
+    `$exe = $resolved.Source`,
+    `$psi = [System.Diagnostics.ProcessStartInfo]::new()`,
+    // Wrap .ps1 scripts via pwsh; .cmd/.bat via cmd /c; executables run directly.
+    `switch -Wildcard ($exe) {`,
+    `  '*.ps1' { $psi.FileName = 'pwsh.exe'; $psi.ArgumentList.Add('-NoProfile'); $psi.ArgumentList.Add('-NonInteractive'); $psi.ArgumentList.Add('-File'); $psi.ArgumentList.Add($exe) }`,
+    `  '*.cmd' { $psi.FileName = 'cmd.exe'; $psi.ArgumentList.Add('/c'); $psi.ArgumentList.Add($exe) }`,
+    `  '*.bat' { $psi.FileName = 'cmd.exe'; $psi.ArgumentList.Add('/c'); $psi.ArgumentList.Add($exe) }`,
+    `  default  { $psi.FileName = $exe }`,
+    `}`,
+    ...argListLines,
+    `$psi.WorkingDirectory = '${psEsc(workingDirectory)}'`,
+    `$psi.RedirectStandardInput = $true`,
+    `$psi.RedirectStandardOutput = $true`,
+    `$psi.RedirectStandardError = $true`,
+    `$psi.UseShellExecute = $false`,
+    `$psi.StandardOutputEncoding = $enc`,
+    `$psi.StandardErrorEncoding = $enc`,
+    `$p = [System.Diagnostics.Process]::Start($psi)`,
+    // Close stdin immediately so child processes that check for pipeline input
+    // (e.g. npm .ps1 wrappers that use $MyInvocation.ExpectingInput) don't hang.
+    `$p.StandardInput.Close()`,
+    // Read both streams concurrently to avoid deadlock when stderr buffer fills.
+    `$outTask = $p.StandardOutput.ReadToEndAsync()`,
+    `$errTask = $p.StandardError.ReadToEndAsync()`,
+    `$p.WaitForExit()`,
+    `[void][System.Threading.Tasks.Task]::WhenAll($outTask, $errTask)`,
+    `[System.IO.File]::WriteAllText('${psEsc(stdoutPath)}', $outTask.Result + $errTask.Result, $enc)`,
+  ];
+
+  return psLines.join('\n');
+}
 
 // Base commands for plan mode (read-only, may prompt for confirmation)
 export const AGENT_COMMANDS: Record<AgentType, string[]> = {
@@ -810,48 +864,9 @@ export class AgentProcess {
         // ArgumentList (available in pwsh / .NET Core) to pass each argument
         // verbatim, capture output as UTF-8, and write it to the log file.
         //
-        // In PowerShell single-quoted strings, only ' needs escaping (doubled: '').
-        // Backslashes are literal, so Windows paths need no extra escaping.
-        const psEsc = (s: string) => s.replace(/'/g, "''");
-        const argListLines = cmd.slice(1).map(a => `$psi.ArgumentList.Add('${psEsc(a)}')`);
-        const psLines = [
-          `$env:CLAUDECODE = $null`,
-          `$enc = [System.Text.UTF8Encoding]::new($false)`,
-          // Resolve the command to its full path so we can handle .ps1/.cmd/.bat wrappers.
-          // npm installs many CLIs as .ps1 scripts (e.g. codex.ps1, gemini.ps1).
-          // ProcessStartInfo with UseShellExecute=false cannot launch .ps1 files directly.
-          `$resolved = Get-Command '${psEsc(cmd[0])}' -ErrorAction SilentlyContinue`,
-          `if ($null -eq $resolved) { [System.IO.File]::WriteAllText('${psEsc(stdoutPath)}', "ERROR: '${psEsc(cmd[0])}' not found in PATH", $enc); exit 1 }`,
-          `$exe = $resolved.Source`,
-          `$psi = [System.Diagnostics.ProcessStartInfo]::new()`,
-          // Wrap .ps1 scripts via pwsh; .cmd/.bat via cmd /c; executables run directly.
-          `switch -Wildcard ($exe) {`,
-          `  '*.ps1' { $psi.FileName = 'pwsh.exe'; $psi.ArgumentList.Add('-NoProfile'); $psi.ArgumentList.Add('-NonInteractive'); $psi.ArgumentList.Add('-File'); $psi.ArgumentList.Add($exe) }`,
-          `  '*.cmd' { $psi.FileName = 'cmd.exe'; $psi.ArgumentList.Add('/c'); $psi.ArgumentList.Add($exe) }`,
-          `  '*.bat' { $psi.FileName = 'cmd.exe'; $psi.ArgumentList.Add('/c'); $psi.ArgumentList.Add($exe) }`,
-          `  default  { $psi.FileName = $exe }`,
-          `}`,
-          ...argListLines,
-          `$psi.WorkingDirectory = '${psEsc(resolvedCwd || process.cwd())}'`,
-          `$psi.RedirectStandardInput = $true`,
-          `$psi.RedirectStandardOutput = $true`,
-          `$psi.RedirectStandardError = $true`,
-          `$psi.UseShellExecute = $false`,
-          `$psi.StandardOutputEncoding = $enc`,
-          `$psi.StandardErrorEncoding = $enc`,
-          `$p = [System.Diagnostics.Process]::Start($psi)`,
-          // Close stdin immediately so child processes that check for pipeline input
-          // (e.g. npm .ps1 wrappers that use $MyInvocation.ExpectingInput) don't hang.
-          `$p.StandardInput.Close()`,
-          // Read both streams concurrently to avoid deadlock when stderr buffer fills.
-          `$outTask = $p.StandardOutput.ReadToEndAsync()`,
-          `$errTask = $p.StandardError.ReadToEndAsync()`,
-          `$p.WaitForExit()`,
-          `[void][System.Threading.Tasks.Task]::WhenAll($outTask, $errTask)`,
-          `[System.IO.File]::WriteAllText('${psEsc(stdoutPath)}', $outTask.Result + $errTask.Result, $enc)`,
-        ];
+        const ps1 = buildWindowsSpawnPs1(cmd, stdoutPath, resolvedCwd || process.cwd());
         const tempScript = path.join(os.tmpdir(), `swarm-agent-${agentId}.ps1`);
-        await fs.writeFile(tempScript, psLines.join('\n'), 'utf-8');
+        await fs.writeFile(tempScript, ps1, 'utf-8');
         // Ensure the output directory exists; the PS1 script creates the file.
         await fs.mkdir(path.dirname(stdoutPath), { recursive: true });
         spawnCmd = 'pwsh.exe';
