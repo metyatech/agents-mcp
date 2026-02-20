@@ -187,13 +187,13 @@ function loadDefaultAgentConfigs(): Record<AgentType, AgentConfig> {
       provider: 'anthropic'
     },
     codex: {
-      // Note: gpt-5.2 (general GPT) and gpt-5.2-codex (coding-optimized) are distinct models.
-      // Use gpt-5.2-codex for code/execution tasks; gpt-5.2 via explicit model param for general reasoning.
+      // Note: gpt-5.3 (general GPT) and gpt-5.3-codex (coding-optimized) are distinct models.
+      // Use gpt-5.3-codex for code/execution tasks; gpt-5.3 via explicit model param for general reasoning.
       command: 'codex exec --sandbox workspace-write \'{prompt}\' --json',
       enabled: true,
       models: {
         fast: 'gpt-5.1-codex-mini',
-        default: 'gpt-5.2-codex',
+        default: 'gpt-5.3-codex',
         detailed: 'gpt-5.3-codex'
       },
       provider: 'openai'

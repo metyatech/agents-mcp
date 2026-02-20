@@ -257,7 +257,7 @@ Checks which agent CLIs are installed using `checkCliAvailable()` in `agents.ts`
       "enabled": true,
       "models": {
         "fast": "gpt-4o-mini",
-        "default": "gpt-5.2-codex",
+        "default": "gpt-5.3-codex",
         "detailed": "gpt-5.1-codex-max"
       },
       "provider": "openai"
@@ -345,7 +345,7 @@ Effort levels map to agent-specific models via `resolveEffortModelMap()` in `age
 | Level | Claude | Codex | Gemini | Cursor | OpenCode |
 |-------|---------|-------|---------|--------|----------|
 | fast | claude-haiku-4-5-20251001 | gpt-4o-mini | gemini-3-flash-preview | composer-1 | zai-coding-plan/glm-4.7-flash |
-| default | claude-sonnet-4-5 | gpt-5.2-codex | gemini-3-flash-preview | composer-1 | zai-coding-plan/glm-4.7 |
+| default | claude-sonnet-4-5 | gpt-5.3-codex | gemini-3-flash-preview | composer-1 | zai-coding-plan/glm-4.7 |
 | detailed | claude-opus-4-5 | gpt-5.1-codex-max | gemini-3-pro-preview | composer-1 | zai-coding-plan/glm-4.7 |
 
 Effort is passed to Spawn tool and resolved to model name via agent config.

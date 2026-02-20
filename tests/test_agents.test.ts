@@ -410,7 +410,7 @@ describe('Effort Model Mapping', () => {
   });
 
   test('should have correct default effort models', () => {
-    expect(EFFORT_MODEL_MAP.default.codex).toBe('gpt-5.2-codex');
+    expect(EFFORT_MODEL_MAP.default.codex).toBe('gpt-5.3-codex');
     expect(EFFORT_MODEL_MAP.default.gemini).toBe('gemini-3-flash-preview');
     expect(EFFORT_MODEL_MAP.default.claude).toBe('claude-sonnet-4-6');
     expect(EFFORT_MODEL_MAP.default.cursor).toBe('composer-1');
@@ -441,7 +441,7 @@ describe('Effort Model Overrides', () => {
     const resolved = resolveEffortModelMap(EFFORT_MODEL_MAP, overrides);
 
     expect(resolved.fast.codex).toBe('gpt-5.2-codex-mini');
-    expect(resolved.default.codex).toBe('gpt-5.2-codex');
+    expect(resolved.default.codex).toBe('gpt-5.3-codex');
     expect(resolved.detailed.codex).toBe('gpt-5.3-codex');
   });
 

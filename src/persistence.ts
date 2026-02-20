@@ -136,7 +136,7 @@ function getDefaultAgentConfig(agentType: AgentType): AgentConfig {
       enabled: true,
       models: {
         fast: 'gpt-4o-mini',
-        default: 'gpt-5.2-codex',
+        default: 'gpt-5.3-codex',
         detailed: 'gpt-5.1-codex-max'
       },
       provider: 'openai'
