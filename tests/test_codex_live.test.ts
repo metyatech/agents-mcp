@@ -42,8 +42,10 @@ async function pollUntilComplete(
 
 describe('Codex Live E2E', () => {
   const [codexAvailable, codexPathOrError] = checkCliAvailable('codex');
+  const liveEnabled = process.env.AGENTS_MCP_RUN_LIVE_TESTS === '1' || process.env.AGENTS_MCP_RUN_LIVE_TESTS === 'true';
+  const shouldRunLive = codexAvailable && liveEnabled;
   
-  (codexAvailable ? test : test.skip)('should spawn codex and parse tool calls correctly', async () => {
+  (shouldRunLive ? test : test.skip)('should spawn codex and parse tool calls correctly', async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'codex-test-'));
     const manager = new AgentManager(50, 10, tempDir);
     
@@ -86,7 +88,7 @@ describe('Codex Live E2E', () => {
     rmSync(tempDir, { recursive: true, force: true });
   }, 120000);
 
-  (codexAvailable ? test : test.skip)('should spawn codex-agent and parse tool calls correctly', async () => {
+  (shouldRunLive ? test : test.skip)('should spawn codex-agent and parse tool calls correctly', async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'codex-test-'));
     const manager = new AgentManager(50, 10, tempDir);
     
@@ -166,7 +168,7 @@ describe('Codex Live E2E', () => {
     }
   }, 180000);
 
-  (codexAvailable ? test : test.skip)(`should work through MCP commands${!codexAvailable ? ` (skipped: ${codexPathOrError})` : ''}`, async () => {
+  (shouldRunLive ? test : test.skip)(`should work through MCP commands${!codexAvailable ? ` (skipped: ${codexPathOrError})` : ''}`, async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'codex-mcp-test-'));
     const manager = new AgentManager(50, 10, tempDir);
     

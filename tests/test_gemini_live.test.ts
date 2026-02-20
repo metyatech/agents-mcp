@@ -42,8 +42,10 @@ async function pollUntilComplete(
 
 describe('Gemini Live E2E', () => {
   const [geminiAvailable, geminiPathOrError] = checkCliAvailable('gemini');
+  const liveEnabled = process.env.AGENTS_MCP_RUN_LIVE_TESTS === '1' || process.env.AGENTS_MCP_RUN_LIVE_TESTS === 'true';
+  const shouldRunLive = geminiAvailable && liveEnabled;
   
-  (geminiAvailable ? test : test.skip)('should spawn gemini and parse tool calls correctly', async () => {
+  (shouldRunLive ? test : test.skip)('should spawn gemini and parse tool calls correctly', async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'gemini-test-'));
     const manager = new AgentManager(50, 10, tempDir);
     
@@ -87,7 +89,7 @@ describe('Gemini Live E2E', () => {
     rmSync(tempDir, { recursive: true, force: true });
   }, 120000);
 
-  (geminiAvailable ? test : test.skip)('should handle comprehensive file operations', async () => {
+  (shouldRunLive ? test : test.skip)('should handle comprehensive file operations', async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'gemini-test-'));
     const manager = new AgentManager(50, 10, tempDir);
     
@@ -176,7 +178,7 @@ describe('Gemini Live E2E', () => {
     }
   }, 180000);
 
-  (geminiAvailable ? test : test.skip)(`should work through MCP commands${!geminiAvailable ? ` (skipped: ${geminiPathOrError})` : ''}`, async () => {
+  (shouldRunLive ? test : test.skip)(`should work through MCP commands${!geminiAvailable ? ` (skipped: ${geminiPathOrError})` : ''}`, async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'gemini-mcp-test-'));
     const manager = new AgentManager(50, 10, tempDir);
     

@@ -41,8 +41,10 @@ async function pollUntilComplete(
 
 describe('Cursor Live E2E', () => {
   const [cursorAvailable, cursorPathOrError] = checkCliAvailable('cursor');
+  const liveEnabled = process.env.AGENTS_MCP_RUN_LIVE_TESTS === '1' || process.env.AGENTS_MCP_RUN_LIVE_TESTS === 'true';
+  const shouldRunLive = cursorAvailable && liveEnabled;
   
-  (cursorAvailable ? test : test.skip)('should spawn cursor-agent and parse tool calls correctly', async () => {
+  (shouldRunLive ? test : test.skip)('should spawn cursor-agent and parse tool calls correctly', async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cursor-test-'));
     const manager = new AgentManager(50, 10, tempDir);
     
@@ -85,7 +87,7 @@ describe('Cursor Live E2E', () => {
     rmSync(tempDir, { recursive: true, force: true });
   }, 120000);
 
-  (cursorAvailable ? test : test.skip)('should handle comprehensive file operations', async () => {
+  (shouldRunLive ? test : test.skip)('should handle comprehensive file operations', async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cursor-test-'));
     const manager = new AgentManager(50, 10, tempDir);
     

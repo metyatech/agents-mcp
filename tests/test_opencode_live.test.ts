@@ -41,8 +41,10 @@ async function pollUntilComplete(
 
 describe('OpenCode Live E2E', () => {
   const [opencodeAvailable, opencodePathOrError] = checkCliAvailable('opencode');
+  const liveEnabled = process.env.AGENTS_MCP_RUN_LIVE_TESTS === '1' || process.env.AGENTS_MCP_RUN_LIVE_TESTS === 'true';
+  const shouldRunLive = opencodeAvailable && liveEnabled;
 
-  (opencodeAvailable ? test : test.skip)('should spawn opencode in edit mode and parse tool calls correctly', async () => {
+  (shouldRunLive ? test : test.skip)('should spawn opencode in edit mode and parse tool calls correctly', async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'opencode-test-'));
     const manager = new AgentManager(50, 10, tempDir);
 
@@ -78,7 +80,7 @@ describe('OpenCode Live E2E', () => {
     rmSync(tempDir, { recursive: true, force: true });
   }, 120000);
 
-  (opencodeAvailable ? test : test.skip)('should spawn opencode in plan mode', async () => {
+  (shouldRunLive ? test : test.skip)('should spawn opencode in plan mode', async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'opencode-plan-test-'));
     const manager = new AgentManager(50, 10, tempDir);
 
@@ -94,7 +96,7 @@ describe('OpenCode Live E2E', () => {
     rmSync(tempDir, { recursive: true, force: true });
   }, 120000);
 
-  (opencodeAvailable ? test : test.skip)('should spawn opencode with fast effort level', async () => {
+  (shouldRunLive ? test : test.skip)('should spawn opencode with fast effort level', async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'opencode-fast-test-'));
     const manager = new AgentManager(50, 10, tempDir);
 

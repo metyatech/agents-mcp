@@ -18,23 +18,24 @@ export function getRalphConfig(): RalphConfig {
 }
 
 export function isDangerousPath(cwd: string): boolean {
-  const dangerousPaths = [
-    os.homedir(),
-    '/',
-    '/System',
-    '/usr',
-    '/bin',
-    '/sbin',
-    '/etc',
+  const dangerousPaths: Array<{ p: string; includeChildren: boolean }> = [
+    // Home itself is dangerous, but project subdirectories under home are common and should be allowed.
+    { p: os.homedir(), includeChildren: false },
+    // System roots should be blocked recursively.
+    { p: '/', includeChildren: true },
+    { p: '/System', includeChildren: true },
+    { p: '/usr', includeChildren: true },
+    { p: '/bin', includeChildren: true },
+    { p: '/sbin', includeChildren: true },
+    { p: '/etc', includeChildren: true },
   ];
 
   const normalizedCwd = path.resolve(cwd);
 
-  for (const dangerousPath of dangerousPaths) {
-    const normalizedDangerous = path.resolve(dangerousPath);
-    if (normalizedCwd === normalizedDangerous || normalizedCwd.startsWith(normalizedDangerous + path.sep)) {
-      return true;
-    }
+  for (const { p, includeChildren } of dangerousPaths) {
+    const normalizedDangerous = path.resolve(p);
+    if (normalizedCwd === normalizedDangerous) return true;
+    if (includeChildren && normalizedCwd.startsWith(normalizedDangerous + path.sep)) return true;
   }
 
   return false;

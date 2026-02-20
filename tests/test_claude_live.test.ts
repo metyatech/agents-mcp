@@ -42,8 +42,10 @@ async function pollUntilComplete(
 
 describe('Claude Live E2E', () => {
   const [claudeAvailable, claudePathOrError] = checkCliAvailable('claude');
+  const liveEnabled = process.env.AGENTS_MCP_RUN_LIVE_TESTS === '1' || process.env.AGENTS_MCP_RUN_LIVE_TESTS === 'true';
+  const shouldRunLive = claudeAvailable && liveEnabled;
   
-  (claudeAvailable ? test : test.skip)('should spawn claude and parse tool calls correctly', async () => {
+  (shouldRunLive ? test : test.skip)('should spawn claude and parse tool calls correctly', async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'claude-test-'));
     const manager = new AgentManager(50, 10, tempDir);
     
@@ -87,7 +89,7 @@ describe('Claude Live E2E', () => {
     rmSync(tempDir, { recursive: true, force: true });
   }, 120000);
 
-  (claudeAvailable ? test : test.skip)('should handle comprehensive file operations', async () => {
+  (shouldRunLive ? test : test.skip)('should handle comprehensive file operations', async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'claude-test-'));
     const manager = new AgentManager(50, 10, tempDir);
     
@@ -168,7 +170,7 @@ describe('Claude Live E2E', () => {
     }
   }, 180000);
 
-  (claudeAvailable ? test : test.skip)(`should work through MCP commands${!claudeAvailable ? ` (skipped: ${claudePathOrError})` : ''}`, async () => {
+  (shouldRunLive ? test : test.skip)(`should work through MCP commands${!claudeAvailable ? ` (skipped: ${claudePathOrError})` : ''}`, async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'claude-mcp-test-'));
     const manager = new AgentManager(50, 10, tempDir);
     

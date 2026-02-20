@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 
 test('examples hello-world prints hello world', async () => {
   const testDir = path.dirname(fileURLToPath(import.meta.url));
-  const workspaceRoot = path.resolve(testDir, '..', '..');
+  const workspaceRoot = path.resolve(testDir, '..');
   const scriptPath = path.join(workspaceRoot, 'examples', 'hello-world.ts');
   const proc = Bun.spawn({
     cmd: [process.execPath, 'run', scriptPath],

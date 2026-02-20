@@ -334,19 +334,23 @@ describe('API Integration Tests', () => {
   });
 
   describe('Multi-Agent Status Polling (Live)', () => {
-    test('should spawn claude, codex, and cursor agents with different tasks and poll status until done', async () => {
+    const liveEnabled = process.env.AGENTS_MCP_RUN_LIVE_TESTS === '1' || process.env.AGENTS_MCP_RUN_LIVE_TESTS === 'true';
+
+    (liveEnabled ? test : test.skip)('should spawn claude, codex, and cursor agents with different tasks and poll status until done', async () => {
       console.log('\n--- TEST: multi-agent status polling (live) ---');
       
-      const testdataDir = path.join(__dirname, 'testdata');
-      const statusLogPath = path.join(testdataDir, 'multi-agent-status-polling.jsonl');
+      const artifactsDir = path.join(testDir, 'multi-agent-status-polling');
+      const statusLogPath = path.join(artifactsDir, 'multi-agent-status-polling.jsonl');
       const { writeFileSync, appendFileSync, mkdirSync } = await import('fs');
       
       const taskName = `multi-agent-live-${Date.now()}`;
       const timestamp = Date.now();
       
-      const codexTaskDir = path.join(testdataDir, `codex-task-${timestamp}`);
-      const cursorTaskDir = path.join(testdataDir, `cursor-task-${timestamp}`);
-      const claudeTaskDir = path.join(testdataDir, `claude-task-${timestamp}`);
+      mkdirSync(artifactsDir, { recursive: true });
+
+      const codexTaskDir = path.join(artifactsDir, `codex-task-${timestamp}`);
+      const cursorTaskDir = path.join(artifactsDir, `cursor-task-${timestamp}`);
+      const claudeTaskDir = path.join(artifactsDir, `claude-task-${timestamp}`);
       
       mkdirSync(codexTaskDir, { recursive: true });
       mkdirSync(cursorTaskDir, { recursive: true });
