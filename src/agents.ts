@@ -108,6 +108,72 @@ export function buildWindowsSpawnPs1(cmd: string[], stdoutPath: string, workingD
   return psLines.join('\n');
 }
 
+/**
+ * Split a shell command string into an argv array, handling single and double quotes.
+ * Used for parsing AgentConfig.command strings from ~/.agents/swarm/config.json.
+ *
+ * Behaviour:
+ *   - Single-quoted tokens: content is taken literally (no escape sequences).
+ *   - Double-quoted tokens: \" and \\ are unescaped; all other chars are literal.
+ *   - Unquoted whitespace (space/tab) separates tokens.
+ *   - Throws on unterminated quotes.
+ */
+export function splitCommandTemplate(cmdStr: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+
+  for (let i = 0; i < cmdStr.length; i++) {
+    const ch = cmdStr[i];
+
+    if (inSingleQuote) {
+      if (ch === "'") {
+        inSingleQuote = false;
+      } else {
+        current += ch;
+      }
+    } else if (inDoubleQuote) {
+      if (ch === '"') {
+        inDoubleQuote = false;
+      } else if (ch === '\\') {
+        const next = cmdStr[i + 1];
+        if (next === '"' || next === '\\') {
+          current += next;
+          i++;
+        } else {
+          current += ch;
+        }
+      } else {
+        current += ch;
+      }
+    } else {
+      if (ch === "'") {
+        inSingleQuote = true;
+      } else if (ch === '"') {
+        inDoubleQuote = true;
+      } else if (ch === ' ' || ch === '\t') {
+        if (current.length > 0) {
+          result.push(current);
+          current = '';
+        }
+      } else {
+        current += ch;
+      }
+    }
+  }
+
+  if (current.length > 0) {
+    result.push(current);
+  }
+
+  if (inSingleQuote || inDoubleQuote) {
+    throw new Error(`Unterminated quote in command template: ${cmdStr}`);
+  }
+
+  return result;
+}
+
 // Base commands for plan mode (read-only, may prompt for confirmation)
 export const AGENT_COMMANDS: Record<AgentType, string[]> = {
   codex: ['codex', 'exec', '--sandbox', 'workspace-write', '{prompt}', '--json'],
@@ -707,6 +773,7 @@ export class AgentProcess {
       this.agentConfigs = loadDefaultAgentConfigs();
       this.effortModelMap = resolveEffortModelMap(this.agentConfigs);
     } else {
+      this.agentConfigs = this.constructorAgentConfigs;
       this.effortModelMap = resolveEffortModelMap(this.constructorAgentConfigs);
     }
 
@@ -939,11 +1006,6 @@ export class AgentProcess {
     model: string,
     cwd: string | null = null
   ): string[] {
-    const cmdTemplate = AGENT_COMMANDS[agentType];
-    if (!cmdTemplate) {
-      throw new Error(`Unknown agent type: ${agentType}`);
-    }
-
     const isEditMode = mode === 'edit';
 
     // Build the full prompt with prefix (for plan mode) and suffix
@@ -952,6 +1014,35 @@ export class AgentProcess {
     // For Claude in plan mode, add prefix explaining headless plan mode restrictions
     if (agentType === 'claude' && !isEditMode) {
       fullPrompt = CLAUDE_PLAN_MODE_PREFIX + fullPrompt;
+    }
+
+    // Check if user has provided a custom command in config (differs from built-in default).
+    // loadDefaultAgentConfigs() returns the same command strings that getDefaultAgentConfig()
+    // writes to config.json, so if the user has not changed their config the strings match
+    // and we fall through to the existing AGENT_COMMANDS path.
+    const defaultAgentCommand = loadDefaultAgentConfigs()[agentType]?.command?.trim() ?? '';
+    const configAgentCommand = this.agentConfigs?.[agentType]?.command?.trim() ?? '';
+
+    if (configAgentCommand && configAgentCommand !== defaultAgentCommand) {
+      // User-provided custom command: parse to argv, validate {prompt}, substitute, return.
+      // Mode flags and model injection are intentionally skipped – the custom command is
+      // expected to be self-contained (the user controls flags and model selection).
+      const template = splitCommandTemplate(configAgentCommand);
+      const hasPromptPlaceholder = template.some(part => part.includes('{prompt}'));
+      if (!hasPromptPlaceholder) {
+        throw new Error(
+          `Agent config for '${agentType}' is missing the required {prompt} placeholder in its command. ` +
+          `Config path: ~/.agents/swarm/config.json. ` +
+          `Example fix: "my-cli run '{prompt}' --json"`
+        );
+      }
+      return template.map(part => part.replace('{prompt}', fullPrompt));
+    }
+
+    // Fall back to built-in AGENT_COMMANDS + existing post-processing (model, mode flags).
+    const cmdTemplate = AGENT_COMMANDS[agentType];
+    if (!cmdTemplate) {
+      throw new Error(`Unknown agent type: ${agentType}`);
     }
 
     let cmd = cmdTemplate.map(part => part.replace('{prompt}', fullPrompt));

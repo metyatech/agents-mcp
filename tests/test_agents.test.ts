@@ -11,6 +11,7 @@ import {
   resolveEffortModelMap,
   resolveMode,
   computePathLCA,
+  splitCommandTemplate,
 } from '../src/agents.js';
 import type { EffortLevel } from '../src/agents.js';
 
@@ -795,5 +796,167 @@ describe('AgentManager', () => {
     // agent-3 should not be affected
     const otherAgent = manager['agents'].get('agent-3');
     expect(otherAgent?.status).toBe(AgentStatus.RUNNING);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Config-driven command templates
+// ---------------------------------------------------------------------------
+
+describe('splitCommandTemplate', () => {
+  test('basic unquoted tokens', () => {
+    expect(splitCommandTemplate('codex exec --sandbox workspace-write {prompt} --json')).toEqual(
+      ['codex', 'exec', '--sandbox', 'workspace-write', '{prompt}', '--json']
+    );
+  });
+
+  test('single-quoted argument strips quotes', () => {
+    expect(splitCommandTemplate("gh copilot suggest '{prompt}' --output json")).toEqual(
+      ['gh', 'copilot', 'suggest', '{prompt}', '--output', 'json']
+    );
+  });
+
+  test('double-quoted argument strips quotes', () => {
+    expect(splitCommandTemplate('my-cli -p "{prompt}" --json')).toEqual(
+      ['my-cli', '-p', '{prompt}', '--json']
+    );
+  });
+
+  test('double-quoted backslash escape sequences', () => {
+    expect(splitCommandTemplate('my-cli "hello \\"world\\""')).toEqual(
+      ['my-cli', 'hello "world"']
+    );
+  });
+
+  test('extra whitespace between tokens is collapsed', () => {
+    expect(splitCommandTemplate('cmd   --flag   {prompt}')).toEqual(
+      ['cmd', '--flag', '{prompt}']
+    );
+  });
+
+  test('throws on unterminated single quote', () => {
+    expect(() => splitCommandTemplate("my-cli '{prompt}")).toThrow('Unterminated quote');
+  });
+
+  test('throws on unterminated double quote', () => {
+    expect(() => splitCommandTemplate('my-cli "{prompt}')).toThrow('Unterminated quote');
+  });
+});
+
+describe('Config-driven buildCommand', () => {
+  let testDir: string;
+  let manager: AgentManager;
+
+  beforeEach(async () => {
+    testDir = path.join(tmpdir(), `cmd_template_tests_${Date.now()}`);
+    await fs.mkdir(testDir, { recursive: true });
+    manager = new AgentManager(5, 10, testDir);
+    await manager['initialize']();
+    manager['agents'].clear();
+  });
+
+  afterEach(async () => {
+    try {
+      await fs.rm(testDir, { recursive: true });
+    } catch {}
+  });
+
+  test('uses custom command from agentConfigs when it differs from default', () => {
+    // Override codex command with a completely different CLI
+    manager['agentConfigs'] = {
+      ...manager['agentConfigs'],
+      codex: {
+        ...manager['agentConfigs'].codex,
+        command: "gh copilot suggest '{prompt}' --output json",
+      },
+    };
+
+    const cmd = manager['buildCommand']('codex', 'write tests', 'plan', 'gpt-5.3-codex');
+
+    expect(cmd[0]).toBe('gh');
+    expect(cmd[1]).toBe('copilot');
+    expect(cmd[2]).toBe('suggest');
+    // {prompt} was substituted with the full prompt
+    expect(cmd[3]).toContain('write tests');
+    expect(cmd[4]).toBe('--output');
+    expect(cmd[5]).toBe('json');
+    // No codex-specific flags injected
+    expect(cmd).not.toContain('exec');
+    expect(cmd).not.toContain('--sandbox');
+    expect(cmd).not.toContain('--model');
+  });
+
+  test('falls back to AGENT_COMMANDS when command matches built-in default', () => {
+    // agentConfigs holds the default command string → falls back to AGENT_COMMANDS
+    const cmd = manager['buildCommand']('codex', 'write tests', 'plan', 'gpt-5.3-codex');
+
+    expect(cmd[0]).toBe('codex');
+    expect(cmd).toContain('exec');
+    expect(cmd).toContain('--sandbox');
+    expect(cmd).toContain('--json');
+    // Model is injected via existing logic
+    expect(cmd).toContain('--model');
+    expect(cmd).toContain('gpt-5.3-codex');
+  });
+
+  test('throws clear error when custom command is missing {prompt}', () => {
+    manager['agentConfigs'] = {
+      ...manager['agentConfigs'],
+      codex: {
+        ...manager['agentConfigs'].codex,
+        command: 'gh copilot suggest --output json',  // no {prompt}
+      },
+    };
+
+    expect(() => {
+      manager['buildCommand']('codex', 'write tests', 'plan', 'gpt-5.3-codex');
+    }).toThrow('{prompt}');
+  });
+
+  test('error message for missing {prompt} mentions config path', () => {
+    manager['agentConfigs'] = {
+      ...manager['agentConfigs'],
+      gemini: {
+        ...manager['agentConfigs'].gemini,
+        command: 'my-gemini-wrapper --output json',  // no {prompt}
+      },
+    };
+
+    let errorMsg = '';
+    try {
+      manager['buildCommand']('gemini', 'write tests', 'plan', 'gemini-3-flash-preview');
+    } catch (e: any) {
+      errorMsg = e.message;
+    }
+
+    expect(errorMsg).toContain('config.json');
+    expect(errorMsg).toContain('{prompt}');
+    expect(errorMsg).toContain('gemini');
+  });
+
+  test('initialize() else-branch correctly assigns agentConfigs when provided via constructor', async () => {
+    const customConfigs = manager['agentConfigs'];
+    const customManager = new AgentManager(5, 10, testDir, null, null, 7, customConfigs);
+    await customManager['initialize']();
+
+    // agentConfigs must be set (was the bug: else-branch skipped assignment)
+    expect(customManager['agentConfigs']).toBeDefined();
+    expect(customManager['agentConfigs']).toEqual(customConfigs);
+  });
+
+  test('custom gemini command is used verbatim (no --yolo appended in edit mode)', () => {
+    manager['agentConfigs'] = {
+      ...manager['agentConfigs'],
+      gemini: {
+        ...manager['agentConfigs'].gemini,
+        command: "my-gemini '{prompt}' --format stream",
+      },
+    };
+
+    const cmd = manager['buildCommand']('gemini', 'write tests', 'edit', 'gemini-3-flash-preview');
+
+    expect(cmd[0]).toBe('my-gemini');
+    expect(cmd).not.toContain('--yolo');
+    expect(cmd).not.toContain('--model');
   });
 });
