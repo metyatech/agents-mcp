@@ -21,7 +21,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "prepare": "npm install --ignore-scripts --no-audit --no-fund && npm run build",
+    "prepare": "node scripts/prepare.mjs",
     "prepublishOnly": "tsc",
     "start": "node dist/index.js",
     "test": "bun test",
