@@ -24,7 +24,7 @@ async function copyDir(src, dest) {
     const srcPath = path.join(src, ent.name);
     const destPath = path.join(dest, ent.name);
 
-    if (ent.name === 'node_modules' || ent.name === '.git') continue;
+    if (ent.name === '.git') continue;
     if (ent.isDirectory()) {
       await copyDir(srcPath, destPath);
       continue;
@@ -78,4 +78,3 @@ async function main() {
 main().catch(() => {
   // Best-effort: never fail installation due to self-heal issues.
 });
-
