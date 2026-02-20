@@ -1,5 +1,6 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 function isTruthy(value) {
@@ -15,6 +16,22 @@ async function pathExists(p) {
   } catch {
     return false;
   }
+}
+
+function runNpm(cwd, extraEnv = {}) {
+  const res = spawnSync('npm', ['install', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], {
+    cwd,
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      // Ensure this nested npm is a project-local install even when we're inside `npm install -g`.
+      npm_config_global: 'false',
+      npm_config_location: 'project',
+      ...extraEnv,
+    },
+    shell: process.platform === 'win32',
+  });
+  return res.status === 0;
 }
 
 async function copyDir(src, dest) {
@@ -73,6 +90,13 @@ async function main() {
   // Removing the linkPath removes the junction but not the moduleRoot target.
   await fs.rm(linkPath, { recursive: true, force: true });
   await fs.rename(tmpDest, linkPath);
+
+  // Ensure runtime dependencies exist in the durable location.
+  // Some npm+Windows+git global installs end up with no dependency tree under the healed directory.
+  const needsDeps = !(await pathExists(path.join(linkPath, 'node_modules', '@modelcontextprotocol', 'sdk', 'package.json')));
+  if (needsDeps) {
+    runNpm(linkPath);
+  }
 }
 
 main().catch(() => {
