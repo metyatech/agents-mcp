@@ -224,6 +224,49 @@ describe('API Integration Tests', () => {
 
       console.log('Cursor test completed successfully!');
     });
+
+    test('should include diagnostics for failed agents', async () => {
+      console.log('\n--- TEST: diagnostics for failed agents ---');
+
+      const agentId = 'failed-agent';
+      const agent = new AgentProcess(
+        agentId,
+        'fail-task',
+        'gemini',
+        'Crash',
+        null,
+        'plan',
+        null,
+        AgentStatus.FAILED,
+        new Date('2026-02-20T00:00:00Z'),
+        null,
+        testDir
+      );
+      manager['agents'].set(agentId, agent);
+
+      const agentDir = path.join(testDir, agentId);
+      await fs.mkdir(agentDir, { recursive: true });
+      await fs.writeFile(
+        path.join(agentDir, 'stdout.log'),
+        ['starting', 'ERROR: tool policy denied', 'stack trace line'].join('\n') + '\n',
+        'utf8'
+      );
+
+      const result = await handleStatus(manager, 'fail-task', 'all');
+      console.log('Result:', JSON.stringify(result, null, 2));
+
+      expect(result.agents.length).toBe(1);
+      const status = result.agents[0];
+      expect(status.status).toBe('failed');
+      expect(status.has_errors).toBe(true);
+      expect(Array.isArray(status.errors)).toBe(true);
+      expect(status.errors.length).toBeGreaterThan(0);
+
+      expect(status.diagnostics).toBeDefined();
+      expect(status.diagnostics?.log_paths?.stdout).toContain('stdout.log');
+      expect(status.diagnostics?.log_tail?.join('\n')).toContain('ERROR: tool policy denied');
+      expect(status.diagnostics?.tail_errors?.length).toBeGreaterThan(0);
+    });
   });
 
   describe('handleStop', () => {

@@ -758,7 +758,7 @@ export class AgentProcess {
   }
 }
 
- export class AgentManager {
+export class AgentManager {
   private agents: Map<string, AgentProcess> = new Map();
   private maxAgents: number;
   private maxConcurrent: number;
@@ -794,6 +794,10 @@ export class AgentProcess {
     this.constructorAgentConfigs = agentConfigs;
 
     this.initialize();
+  }
+
+  getAgentsDirPath(): string {
+    return this.agentsDir;
   }
 
   private async initialize(): Promise<void> {

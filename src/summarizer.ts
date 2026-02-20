@@ -23,6 +23,46 @@ function extractErrorFromRawEvents(events: any[], maxChars: number = 500): strin
   return null;
 }
 
+export function getErrorSnippets(events: any[], maxItems: number = 3): string[] {
+  const errors: string[] = [];
+
+  for (const event of events) {
+    const eventType = event?.type || '';
+
+    if (eventType === 'error') {
+      for (const key of ['message', 'content', 'error', 'error_message', 'details']) {
+        if (event?.[key]) {
+          errors.push(String(event[key]));
+          break;
+        }
+      }
+      continue;
+    }
+
+    if (eventType === 'result' && event?.status === 'error') {
+      for (const key of ['message', 'error', 'error_message', 'error_details', 'details']) {
+        if (event?.[key]) {
+          errors.push(String(event[key]));
+          break;
+        }
+      }
+      continue;
+    }
+  }
+
+  if (errors.length === 0) {
+    const fallback = extractErrorFromRawEvents(events);
+    if (fallback) errors.push(fallback);
+  }
+
+  const trimmed = errors
+    .map((e) => e.trim())
+    .filter(Boolean)
+    .map((e) => (e.length > 500 ? e.substring(0, 497) + '...' : e));
+
+  return trimmed.slice(-Math.max(0, maxItems));
+}
+
 export const PRIORITY: Record<string, string[]> = {
   critical: [
     'error',

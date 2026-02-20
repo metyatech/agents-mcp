@@ -7,7 +7,7 @@ import * as fs from 'fs/promises';
 
 import { AgentManager, AgentStatus, resolveMode } from './agents.js';
 import { AgentType } from './parsers.js';
-import { getDelta } from './summarizer.js';
+import { getDelta, getErrorSnippets } from './summarizer.js';
 import { readConfig } from './persistence.js';
 
 /**
@@ -47,6 +47,12 @@ export interface AgentStatusDetail {
   last_messages: string[];
   tool_count: number;
   has_errors: boolean;
+  errors: string[];
+  diagnostics?: {
+    log_paths: { agent_dir: string; stdout: string; meta: string };
+    log_tail: string[];
+    tail_errors: string[];
+  };
   cursor: string;  // ISO timestamp - send back in next request for delta
 }
 
@@ -78,6 +84,37 @@ export interface TaskInfo {
 
 export interface TasksResult {
   tasks: TaskInfo[];
+}
+
+async function readTailLines(
+  filePath: string,
+  maxLines: number = 25,
+  maxBytes: number = 64 * 1024
+): Promise<string[]> {
+  const stats = await fs.stat(filePath).catch(() => null);
+  if (!stats) return [];
+
+  const toRead = Math.min(stats.size, maxBytes);
+  const startPos = Math.max(0, stats.size - toRead);
+  const fd = await fs.open(filePath, 'r');
+  try {
+    const buffer = Buffer.alloc(toRead);
+    const { bytesRead } = await fd.read(buffer, 0, toRead, startPos);
+    const text = buffer.toString('utf-8', 0, bytesRead);
+    const lines = text.split(/\r?\n/);
+    return lines.slice(-maxLines).filter((l) => l.trim().length > 0);
+  } finally {
+    await fd.close();
+  }
+}
+
+function extractErrorLinesFromTail(lines: string[], maxItems: number = 3): string[] {
+  const keywords = ['error', 'failed', 'exception', 'denied', 'quota', 'rate limit', '429', '403', '401', 'policy'];
+  const matches = lines.filter((line) => {
+    const lower = line.toLowerCase();
+    return keywords.some((k) => lower.includes(k));
+  });
+  return matches.slice(-Math.max(0, maxItems));
 }
 
 export async function handleSpawn(
@@ -243,6 +280,32 @@ export async function handleStatus(
       maxTimestamp = agentTimestamp;
     }
 
+    const errors = getErrorSnippets(events, 3);
+    const hasErrors = errors.length > 0 || delta.new_errors.length > 0;
+
+    const diagnostics =
+      agent.status === AgentStatus.FAILED
+        ? (() => {
+            const agentDir = path.join(manager.getAgentsDirPath(), agent.agentId);
+            const stdoutPath = path.join(agentDir, 'stdout.log');
+            const metaPath = path.join(agentDir, 'meta.json');
+            return { agentDir, stdoutPath, metaPath };
+          })()
+        : null;
+
+    const diagPayload =
+      diagnostics
+        ? {
+            log_paths: { agent_dir: diagnostics.agentDir, stdout: diagnostics.stdoutPath, meta: diagnostics.metaPath },
+            log_tail: await readTailLines(diagnostics.stdoutPath),
+            tail_errors: [] as string[],
+          }
+        : undefined;
+
+    if (diagPayload) {
+      diagPayload.tail_errors = extractErrorLinesFromTail(diagPayload.log_tail, 3);
+    }
+
     agentStatuses.push({
       agent_id: agent.agentId,
       agent_type: agent.agentType,
@@ -255,7 +318,9 @@ export async function handleStatus(
       bash_commands: delta.new_bash_commands.map((cmd: string) => truncateBashCommand(cmd)),
       last_messages: delta.new_messages,
       tool_count: delta.new_tool_count,
-      has_errors: delta.new_errors.length > 0,
+      has_errors: hasErrors,
+      errors,
+      diagnostics: diagPayload,
       cursor: agentTimestamp,  // Return latest timestamp for this agent
     });
   }
