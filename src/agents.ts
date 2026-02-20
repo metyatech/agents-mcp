@@ -174,6 +174,38 @@ export function splitCommandTemplate(cmdStr: string): string[] {
   return result;
 }
 
+function isCompatibleAgentCli(agentType: AgentType, firstArg: string | undefined): boolean {
+  if (!firstArg) return false;
+  const exe = path.basename(firstArg).toLowerCase();
+
+  switch (agentType) {
+    case 'codex':
+      return exe === 'codex' || exe === 'codex.exe';
+    case 'claude':
+      return exe === 'claude' || exe === 'claude.exe';
+    case 'gemini':
+      return exe === 'gemini' || exe === 'gemini.exe';
+    case 'cursor':
+      return exe === 'cursor-agent' || exe === 'cursor-agent.exe';
+    case 'opencode':
+      return exe === 'opencode' || exe === 'opencode.exe';
+    default:
+      return false;
+  }
+}
+
+function ensureClaudeFlag(cmd: string[], flag: string, value?: string): string[] {
+  const out = [...cmd];
+  const flagIndex = out.indexOf(flag);
+  if (flagIndex !== -1) return out;
+  if (value === undefined) {
+    out.push(flag);
+  } else {
+    out.push(flag, value);
+  }
+  return out;
+}
+
 // Base commands for plan mode (read-only, may prompt for confirmation)
 export const AGENT_COMMANDS: Record<AgentType, string[]> = {
   codex: ['codex', 'exec', '--sandbox', 'workspace-write', '{prompt}', '--json'],
@@ -1016,50 +1048,52 @@ export class AgentProcess {
       fullPrompt = CLAUDE_PLAN_MODE_PREFIX + fullPrompt;
     }
 
-    // Check if user has provided a custom command in config (differs from built-in default).
-    // loadDefaultAgentConfigs() returns the same command strings that getDefaultAgentConfig()
-    // writes to config.json, so if the user has not changed their config the strings match
-    // and we fall through to the existing AGENT_COMMANDS path.
-    const defaultAgentCommand = loadDefaultAgentConfigs()[agentType]?.command?.trim() ?? '';
     const configAgentCommand = this.agentConfigs?.[agentType]?.command?.trim() ?? '';
 
-    if (configAgentCommand && configAgentCommand !== defaultAgentCommand) {
-      // User-provided custom command: parse to argv, validate {prompt}, substitute, return.
-      // Mode flags and model injection are intentionally skipped – the custom command is
-      // expected to be self-contained (the user controls flags and model selection).
-      const template = splitCommandTemplate(configAgentCommand);
-      const hasPromptPlaceholder = template.some(part => part.includes('{prompt}'));
-      if (!hasPromptPlaceholder) {
-        throw new Error(
-          `Agent config for '${agentType}' is missing the required {prompt} placeholder in its command. ` +
+    // Prefer config command when present. This is a *template* override; when the command still
+    // targets the known agent CLI (codex/claude/gemini/...), we keep applying the normal
+    // post-processing (model injection, mode flags, etc.). If the user points to a different
+    // executable, we treat it as fully custom and return it verbatim after {prompt} substitution.
+    const baseTemplate = configAgentCommand
+      ? splitCommandTemplate(configAgentCommand)
+      : AGENT_COMMANDS[agentType];
+    if (!baseTemplate) throw new Error(`Unknown agent type: ${agentType}`);
+
+    const hasPromptPlaceholder = baseTemplate.some(part => part.includes('{prompt}'));
+    if (!hasPromptPlaceholder) {
+      throw new Error(
+        `Agent config for '${agentType}' is missing the required {prompt} placeholder in its command. ` +
           `Config path: ~/.agents/swarm/config.json. ` +
           `Example fix: "my-cli run '{prompt}' --json"`
-        );
-      }
-      return template.map(part => part.replace('{prompt}', fullPrompt));
+      );
     }
 
-    // Fall back to built-in AGENT_COMMANDS + existing post-processing (model, mode flags).
-    const cmdTemplate = AGENT_COMMANDS[agentType];
-    if (!cmdTemplate) {
-      throw new Error(`Unknown agent type: ${agentType}`);
-    }
+    let cmd = baseTemplate.map(part => part.replaceAll('{prompt}', fullPrompt));
 
-    let cmd = cmdTemplate.map(part => part.replace('{prompt}', fullPrompt));
+    const isCompatibleCli = isCompatibleAgentCli(agentType, cmd[0]);
+    if (!isCompatibleCli) {
+      return cmd;
+    }
 
     // For Claude agents, load user's settings.json to inherit permissions
     // and grant access to the working directory
     if (agentType === 'claude') {
+      // Ensure required flags for stream-json print mode (older config files may omit these).
+      cmd = ensureClaudeFlag(cmd, '--verbose');
+      cmd = ensureClaudeFlag(cmd, '--permission-mode', 'plan');
+
       const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
-      cmd.push('--settings', settingsPath);
+      if (!cmd.includes('--settings')) cmd.push('--settings', settingsPath);
 
       if (cwd) {
-        cmd.push('--add-dir', cwd);
+        if (!cmd.includes('--add-dir')) cmd.push('--add-dir', cwd);
       }
     }
 
     // Add model flag for each agent type
-    if (agentType === 'codex') {
+    if (cmd.includes('--model')) {
+      // no-op
+    } else if (agentType === 'codex') {
       const execIndex = cmd.indexOf('exec');
       const sandboxIndex = cmd.indexOf('--sandbox');
       const insertIndex = sandboxIndex !== -1 ? sandboxIndex : execIndex + 1;

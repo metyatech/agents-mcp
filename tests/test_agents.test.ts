@@ -886,6 +886,47 @@ describe('Config-driven buildCommand', () => {
     expect(cmd).not.toContain('--model');
   });
 
+  test('compatible codex custom command still injects model and mode flags', () => {
+    manager['agentConfigs'] = {
+      ...manager['agentConfigs'],
+      codex: {
+        ...manager['agentConfigs'].codex,
+        command: "codex -a never exec --skip-git-repo-check --sandbox danger-full-access '{prompt}' --json",
+      },
+    };
+
+    const cmd = manager['buildCommand']('codex', 'write tests', 'edit', 'gpt-5.3-codex');
+
+    expect(cmd[0]).toBe('codex');
+    expect(cmd).toContain('--sandbox');
+    expect(cmd).toContain('danger-full-access');
+    expect(cmd).toContain('--model');
+    expect(cmd).toContain('gpt-5.3-codex');
+    expect(cmd).toContain('--full-auto');
+  });
+
+  test('compatible claude custom command gets required flags and settings', () => {
+    manager['agentConfigs'] = {
+      ...manager['agentConfigs'],
+      claude: {
+        ...manager['agentConfigs'].claude,
+        command: "claude -p '{prompt}' --output-format stream-json",
+      },
+    };
+
+    const cmd = manager['buildCommand']('claude', 'write tests', 'edit', 'claude-sonnet-4-6', testDir);
+
+    expect(cmd[0]).toBe('claude');
+    expect(cmd).toContain('--verbose');
+    expect(cmd).toContain('--permission-mode');
+    expect(cmd).toContain('acceptEdits');
+    expect(cmd).toContain('--settings');
+    expect(cmd).toContain('--add-dir');
+    expect(cmd).toContain(testDir);
+    expect(cmd).toContain('--model');
+    expect(cmd).toContain('claude-sonnet-4-6');
+  });
+
   test('falls back to AGENT_COMMANDS when command matches built-in default', () => {
     // agentConfigs holds the default command string → falls back to AGENT_COMMANDS
     const cmd = manager['buildCommand']('codex', 'write tests', 'plan', 'gpt-5.3-codex');
