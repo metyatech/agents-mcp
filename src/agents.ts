@@ -1,4 +1,5 @@
-import { spawn, execSync, ChildProcess } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
+import { accessSync, constants as fsConstants, existsSync } from 'fs';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
@@ -450,6 +451,75 @@ export function resolveMode(
   return normalizedDefault;
 }
 
+function findExecutableOnPath(executable: string): string | null {
+  const hasSeparator = executable.includes(path.sep) || (process.platform === 'win32' && executable.includes('/'));
+  const pathCandidate = hasSeparator || path.isAbsolute(executable) ? executable : null;
+
+  const isFileUsable = (candidatePath: string): boolean => {
+    if (!existsSync(candidatePath)) return false;
+    if (process.platform === 'win32') return true;
+    try {
+      accessSync(candidatePath, fsConstants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const tryWithExtensions = (basePath: string, extensions: string[]): string | null => {
+    if (path.extname(basePath)) {
+      if (isFileUsable(basePath)) return basePath;
+      return null;
+    }
+
+    if (isFileUsable(basePath)) return basePath;
+
+    for (const ext of extensions) {
+      const candidate = basePath + ext;
+      if (isFileUsable(candidate)) return candidate;
+    }
+    return null;
+  };
+
+  if (pathCandidate) {
+    const extensions =
+      process.platform === 'win32'
+        ? ['.exe', '.cmd', '.bat', '.ps1']
+        : [''];
+    return tryWithExtensions(path.resolve(pathCandidate), extensions);
+  }
+
+  const envPath = process.env.PATH || '';
+  const pathParts = envPath.split(path.delimiter).filter(Boolean);
+
+  if (process.platform === 'win32') {
+    const pathextRaw = process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD';
+    const pathext = pathextRaw
+      .split(';')
+      .map(e => e.trim())
+      .filter(Boolean)
+      .map(e => (e.startsWith('.') ? e.toLowerCase() : `.${e.toLowerCase()}`));
+
+    const extra = ['.exe', '.cmd', '.bat', '.ps1'];
+    const extensions = Array.from(new Set([...pathext, ...extra]));
+
+    for (const dir of pathParts) {
+      const base = path.join(dir, executable);
+      const found = tryWithExtensions(base, extensions);
+      if (found) return found;
+    }
+
+    return null;
+  }
+
+  for (const dir of pathParts) {
+    const candidate = path.join(dir, executable);
+    if (isFileUsable(candidate)) return candidate;
+  }
+
+  return null;
+}
+
 export function checkCliAvailable(agentType: AgentType): [boolean, string | null] {
   const cmdTemplate = AGENT_COMMANDS[agentType];
   if (!cmdTemplate) {
@@ -457,12 +527,9 @@ export function checkCliAvailable(agentType: AgentType): [boolean, string | null
   }
 
   const executable = cmdTemplate[0];
-  try {
-    const whichPath = execSync(`which ${executable}`, { encoding: 'utf-8' }).trim();
-    return [true, whichPath];
-  } catch {
-    return [false, `CLI tool '${executable}' not found in PATH. Install it first.`];
-  }
+  const resolvedPath = findExecutableOnPath(executable);
+  if (resolvedPath) return [true, resolvedPath];
+  return [false, `CLI tool '${executable}' not found in PATH. Install it first.`];
 }
 
 export function checkAllClis(): Record<string, { installed: boolean; path: string | null; error: string | null }> {
