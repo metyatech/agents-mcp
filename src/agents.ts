@@ -206,6 +206,18 @@ function ensureClaudeFlag(cmd: string[], flag: string, value?: string): string[]
   return out;
 }
 
+function ensureGeminiHeadlessFlag(cmd: string[], promptText: string): string[] {
+  if (cmd.includes('-p') || cmd.includes('--prompt')) return [...cmd];
+  const out = [...cmd];
+  const promptIdx = out.indexOf(promptText);
+  if (promptIdx !== -1) {
+    out.splice(promptIdx, 0, '-p');
+  } else {
+    out.push('-p');
+  }
+  return out;
+}
+
 // Base commands for plan mode (read-only, may prompt for confirmation)
 export const AGENT_COMMANDS: Record<AgentType, string[]> = {
   codex: ['codex', 'exec', '--sandbox', 'workspace-write', '{prompt}', '--json'],
@@ -297,7 +309,7 @@ function loadDefaultAgentConfigs(): Record<AgentType, AgentConfig> {
       provider: 'openai'
     },
     gemini: {
-      command: 'gemini \'{prompt}\' --output-format stream-json',
+      command: 'gemini -p \'{prompt}\' --output-format stream-json',
       enabled: true,
       models: {
         fast: 'gemini-3-flash-preview',
@@ -636,11 +648,21 @@ export class AgentProcess {
             }
           }
         } catch {
-          this.eventsCache.push({
-            type: 'raw',
-            content: line,
-            timestamp: fallbackTimestamp,
-          });
+          // Suppress noisy node-pty AttachConsole stack traces emitted by gemini
+          // helper processes on Windows; they are not actionable errors.
+          const isGeminiWin32Noise =
+            this.agentType === 'gemini' &&
+            process.platform === 'win32' &&
+            (line.includes('AttachConsole failed') ||
+              line.includes('conpty_console_list_agent') ||
+              (line.includes('@lydell') && line.includes('node-pty')));
+          if (!isGeminiWin32Noise) {
+            this.eventsCache.push({
+              type: 'raw',
+              content: line,
+              timestamp: fallbackTimestamp,
+            });
+          }
         }
       }
     } catch (err) {
@@ -1091,6 +1113,22 @@ export class AgentManager {
 
       if (cwd) {
         if (!cmd.includes('--add-dir')) cmd.push('--add-dir', cwd);
+      }
+    }
+
+    // For Gemini agents, ensure -p is present so the CLI runs headlessly
+    // (without -p the gemini CLI tries to attach to an interactive console).
+    if (agentType === 'gemini') {
+      cmd = ensureGeminiHeadlessFlag(cmd, fullPrompt);
+    }
+
+    // For Gemini agents in plan mode, add --approval-mode plan to suppress tool
+    // execution (e.g. shell calls like `echo OK`), which would otherwise trigger
+    // node-pty/ConPTY AttachConsole errors on Windows.
+    // Skip if --yolo or --approval-mode is already present in the command.
+    if (agentType === 'gemini' && mode === 'plan') {
+      if (!cmd.includes('--approval-mode') && !cmd.includes('--yolo')) {
+        cmd.push('--approval-mode', 'plan');
       }
     }
 

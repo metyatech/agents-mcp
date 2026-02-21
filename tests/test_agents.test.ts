@@ -381,6 +381,56 @@ describe('AgentProcess', () => {
     const result = agent.toDict();
     expect(result.workspace_dir).toBe('/Users/test/project');
   });
+
+  test('suppresses gemini node-pty AttachConsole noise on win32', async () => {
+    const baseDir = path.join(TESTDATA_DIR, `agent_noise_${Date.now()}`);
+    const agentId = 'agent-noise-test';
+    const agentDir = path.join(baseDir, agentId);
+    const logPath = path.join(agentDir, 'stdout.log');
+
+    await fs.mkdir(agentDir, { recursive: true });
+
+    const noiseLines = [
+      'Error: AttachConsole failed with error 6',
+      '    at Object.<anonymous> (node_modules/@lydell/node-pty/build/node_pty.js:1)',
+      '    at node-pty\\conpty_console_list_agent.js:11:5',
+    ];
+    const normalLine = 'some normal non-json output from agent';
+    const logContent = [...noiseLines, normalLine].join('\n') + '\n';
+    await fs.writeFile(logPath, logContent);
+
+    const agent = new AgentProcess(
+      agentId,
+      'noise-task',
+      'gemini',
+      'Test prompt',
+      null,
+      'plan',
+      999999,
+      AgentStatus.RUNNING,
+      new Date(),
+      null,
+      baseDir
+    );
+
+    try {
+      await agent.readNewEvents();
+
+      const rawContents = agent.events.filter(e => e.type === 'raw').map((e: any) => e.content);
+
+      // Normal non-JSON lines must always appear regardless of platform
+      expect(rawContents).toContain(normalLine);
+
+      if (process.platform === 'win32') {
+        // On Windows, AttachConsole noise must be suppressed for gemini agents
+        for (const noiseLine of noiseLines) {
+          expect(rawContents).not.toContain(noiseLine);
+        }
+      }
+    } finally {
+      await fs.rm(baseDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('Effort Model Mapping', () => {
@@ -999,5 +1049,75 @@ describe('Config-driven buildCommand', () => {
     expect(cmd[0]).toBe('my-gemini');
     expect(cmd).not.toContain('--yolo');
     expect(cmd).not.toContain('--model');
+  });
+
+  test('compatible gemini command without -p gets -p injected before prompt (headless mode fix)', () => {
+    // Simulates a legacy/custom config that omits -p, which causes AttachConsole
+    // errors on Windows when gemini tries to start in interactive (TTY) mode.
+    manager['agentConfigs'] = {
+      ...manager['agentConfigs'],
+      gemini: {
+        ...manager['agentConfigs'].gemini,
+        command: "gemini '{prompt}' --output-format stream-json",
+      },
+    };
+
+    const cmd = manager['buildCommand']('gemini', 'write tests', 'plan', 'gemini-3-flash-preview');
+
+    expect(cmd[0]).toBe('gemini');
+    expect(cmd).toContain('-p');
+    // -p must appear before the prompt argument
+    const pIdx = cmd.indexOf('-p');
+    const promptIdx = cmd.findIndex(part => part.includes('write tests'));
+    expect(pIdx).toBeLessThan(promptIdx);
+  });
+
+  test('compatible gemini command that already has -p is not modified', () => {
+    manager['agentConfigs'] = {
+      ...manager['agentConfigs'],
+      gemini: {
+        ...manager['agentConfigs'].gemini,
+        command: "gemini -p '{prompt}' --output-format stream-json",
+      },
+    };
+
+    const cmd = manager['buildCommand']('gemini', 'write tests', 'plan', 'gemini-3-flash-preview');
+
+    expect(cmd[0]).toBe('gemini');
+    // Only one -p occurrence
+    expect(cmd.filter(a => a === '-p').length).toBe(1);
+  });
+
+  test('legacy gemini command (no -p) in plan mode includes --approval-mode plan', () => {
+    // Simulates a legacy config that omits -p; plan mode must add --approval-mode plan
+    // so gemini does not execute shell tool calls that trigger AttachConsole errors.
+    manager['agentConfigs'] = {
+      ...manager['agentConfigs'],
+      gemini: {
+        ...manager['agentConfigs'].gemini,
+        command: "gemini '{prompt}' --output-format stream-json",
+      },
+    };
+
+    const cmd = manager['buildCommand']('gemini', 'hi', 'plan', 'gemini-3-flash-preview');
+
+    expect(cmd[0]).toBe('gemini');
+    expect(cmd).toContain('--approval-mode');
+    const idx = cmd.indexOf('--approval-mode');
+    expect(cmd[idx + 1]).toBe('plan');
+  });
+
+  test('gemini plan mode does not duplicate --approval-mode when already present in config', () => {
+    manager['agentConfigs'] = {
+      ...manager['agentConfigs'],
+      gemini: {
+        ...manager['agentConfigs'].gemini,
+        command: "gemini -p '{prompt}' --output-format stream-json --approval-mode plan",
+      },
+    };
+
+    const cmd = manager['buildCommand']('gemini', 'hi', 'plan', 'gemini-3-flash-preview');
+
+    expect(cmd.filter(a => a === '--approval-mode').length).toBe(1);
   });
 });

@@ -142,7 +142,7 @@ function getDefaultAgentConfig(agentType: AgentType): AgentConfig {
       provider: 'openai'
     },
     gemini: {
-      command: 'gemini \'{prompt}\' --output-format stream-json',
+      command: 'gemini -p \'{prompt}\' --output-format stream-json',
       enabled: true,
       models: {
         fast: 'gemini-3-flash-preview',
