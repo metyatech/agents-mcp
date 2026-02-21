@@ -30,7 +30,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/agent-rules-composition.m
 - When creating a new repository, set up rule files (e.g., agent-ruleset.json and any local rules) so compose-agentsmd can run.
 - When updating rules, infer the core intent; if it is a global policy, record it in global rules rather than project-local rules.
 - If a task requires domain rules not listed in agent-ruleset.json, update the ruleset to include them and regenerate AGENTS.md before proceeding.
-- When rule changes produce a diff, include it in the final response unless the user explicitly asks to omit it.
+- Do not include composed `AGENTS.md` diffs in the final response unless the user explicitly asks for them.
 
 ## Editing standards
 
@@ -312,6 +312,15 @@ When operating in delegated mode:
 - Report AC and verification outcomes concisely to the delegating agent.
 - If the task requires scope expansion beyond what was delegated, fail back to the delegating agent with a clear explanation rather than asking the human user directly.
 
+## Delegation prompt hygiene
+
+- Delegated agents MUST treat the delegator as the requester and MUST NOT ask the human user for plan approval. If blocked by repo rules, escalate to the delegator (not the human).
+- Delegating prompts MUST explicitly state delegated mode and whether plan approval is already granted; include AC and verification requirements.
+
+## Read-only / no-write claims
+
+- If a delegated agent reports read-only/no-write constraints, it MUST attempt a minimal, reversible temp-directory probe (create/write/read/delete under the OS temp directory) and report the exact failure/rejection message verbatim.
+
 ## Restricted operations
 
 The following operations require explicit delegation from the delegating agent or user. Do not perform them based on self-judgment alone:
@@ -383,6 +392,13 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/planning-and-approval-gat
   - Confirm the plan with the requester, ask for approval explicitly, and wait for a clear "yes" before executing.
   - Once the requester has approved a plan, proceed within that plan without re-requesting approval; re-request approval only when you change or expand the plan.
   - Do not treat the original task request as plan approval; approval must be an explicit response to the presented plan.
+  - Include a compact approval-request block at the end of the plan proposal message so the requester can approve with a single short reply.
+    - Template:
+      ```text
+      Approval request
+      - Reply "yes" to approve this plan and proceed.
+      - Reply with changes to revise before executing.
+      ```
 - If state-changing execution starts without the required post-plan "yes", stop immediately, report the gate miss, add/update a prevention rule, regenerate AGENTS.md, and then restart from the approval gate.
 - No other exceptions: even if the user requests immediate execution (e.g., "skip planning", "just do it"), treat that as a request to move quickly through this gate, not to bypass it.
 
