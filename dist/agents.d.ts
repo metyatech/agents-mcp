@@ -26,10 +26,6 @@ export declare function buildWindowsSpawnPs1(cmd: string[], stdoutPath: string, 
  */
 export declare function splitCommandTemplate(cmdStr: string): string[];
 export declare const AGENT_COMMANDS: Record<AgentType, string[]>;
-export type EffortLevel = 'fast' | 'default' | 'detailed';
-export type EffortModelMap = Record<EffortLevel, Record<AgentType, string>>;
-export declare function resolveEffortModelMap(baseOrAgentConfigs: EffortModelMap | Record<AgentType, AgentConfig>, overrides?: Partial<Record<AgentType, Partial<Record<EffortLevel, string>>>>): EffortModelMap;
-export declare const EFFORT_MODEL_MAP: EffortModelMap;
 declare const VALID_MODES: readonly ["plan", "edit", "ralph"];
 type Mode = typeof VALID_MODES[number];
 export declare function resolveMode(requestedMode: string | null | undefined, defaultMode?: Mode): Mode;
@@ -88,7 +84,6 @@ export declare class AgentManager {
     private filterByCwd;
     private cleanupAgeDays;
     private defaultMode;
-    private effortModelMap;
     private agentConfigs;
     private constructorAgentConfigs;
     private constructorAgentsDir;
@@ -100,13 +95,13 @@ export declare class AgentManager {
     getDefaultMode(): Mode;
     setModelOverrides(agentConfigs: Record<AgentType, AgentConfig>): void;
     private loadExistingAgents;
-    spawn(taskName: string, agentType: AgentType, prompt: string, cwd?: string | null, mode?: Mode | null, effort?: EffortLevel, parentSessionId?: string | null, workspaceDir?: string | null, model?: string | null): Promise<AgentProcess>;
+    spawn(taskName: string, agentType: AgentType, prompt: string, cwd?: string | null, mode?: Mode | null, parentSessionId?: string | null, workspaceDir?: string | null, model?: string | null, reasoningEffort?: string | null): Promise<AgentProcess>;
     private buildCommand;
     private applyEditMode;
     private applyRalphMode;
     private static readonly REPLY_SUPPORTED_AGENTS;
     buildReplyCommand(agentType: AgentType, message: string, sessionId: string | null, mode: Mode, model: string, cwd?: string | null): string[];
-    reply(originalAgent: AgentProcess, message: string, effort?: EffortLevel, model?: string | null): Promise<AgentProcess>;
+    reply(originalAgent: AgentProcess, message: string, model?: string | null): Promise<AgentProcess>;
     get(agentId: string): Promise<AgentProcess | null>;
     listAll(): Promise<AgentProcess[]>;
     listRunning(): Promise<AgentProcess[]>;

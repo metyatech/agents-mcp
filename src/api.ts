@@ -139,17 +139,16 @@ export async function handleSpawn(
   prompt: string,
   cwd: string | null,
   mode: string | null,
-  effort: 'fast' | 'default' | 'detailed' | null = 'default',
   parentSessionId: string | null = null,
   workspaceDir: string | null = null,
-  model: string | null = null
+  model: string | null = null,
+  effort: string | null = null
 ): Promise<SpawnResult> {
   const defaultMode = manager.getDefaultMode();
   const resolvedMode = resolveMode(mode, defaultMode);
-  const resolvedEffort = effort ?? 'default';
 
   console.error(
-    `[spawn] Spawning ${agentType} agent for task "${taskName}" [${resolvedMode}] effort=${resolvedEffort}${model ? ` model=${model}` : ''}...`
+    `[spawn] Spawning ${agentType} agent for task "${taskName}" [${resolvedMode}]${effort ? ` effort=${effort}` : ''}${model ? ` model=${model}` : ''}...`
   );
 
   // Ralph mode special handling
@@ -188,10 +187,10 @@ export async function handleSpawn(
       ralphPrompt,
       cwd,
       resolvedMode,
-      resolvedEffort,
       parentSessionId,
       workspaceDir,
-      model
+      model,
+      effort
     );
 
     console.error(`[ralph] Spawned ${agentType} agent ${agent.agentId} for autonomous execution`);
@@ -213,10 +212,10 @@ export async function handleSpawn(
     prompt,
     cwd,
     resolvedMode,
-    resolvedEffort,
     parentSessionId,
     workspaceDir,
-    model
+    model,
+    effort
   );
 
   console.error(`[spawn] Spawned ${agentType} agent ${agent.agentId} for task "${taskName}"`);

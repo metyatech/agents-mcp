@@ -234,60 +234,6 @@ export const AGENT_COMMANDS: Record<AgentType, string[]> = {
   copilot: ['copilot', '-p', '{prompt}', '-s'],
 };
 
-// Effort level type
-export type EffortLevel = 'fast' | 'default' | 'detailed';
-export type EffortModelMap = Record<EffortLevel, Record<AgentType, string>>;
-
-// Build effort model map from agent configs
-export function resolveEffortModelMap(
-  baseOrAgentConfigs: EffortModelMap | Record<AgentType, AgentConfig>,
-  overrides?: Partial<Record<AgentType, Partial<Record<EffortLevel, string>>>>
-): EffortModelMap {
-  // Check if first arg is base EffortModelMap (old API) or agent configs (new API)
-  const hasBaseOverrides = arguments.length > 1;
-
-  if (hasBaseOverrides && overrides) {
-    // Old API: resolveEffortModelMap(base, overrides)
-    const base = baseOrAgentConfigs as EffortModelMap;
-    const resolved: EffortModelMap = {
-      fast: { ...base.fast },
-      default: { ...base.default },
-      detailed: { ...base.detailed }
-    };
-
-    for (const [agentType, effortOverrides] of Object.entries(overrides)) {
-      if (!effortOverrides) continue;
-      const typedAgent = agentType as AgentType;
-      for (const level of ['fast', 'default', 'detailed'] as const) {
-        const model = effortOverrides[level];
-        if (typeof model === 'string') {
-          const trimmed = model.trim();
-          if (trimmed) {
-            resolved[level][typedAgent] = trimmed;
-          }
-        }
-      }
-    }
-
-    return resolved;
-  } else {
-    // New API: resolveEffortModelMap(agentConfigs)
-    const agentConfigs = baseOrAgentConfigs as Record<AgentType, AgentConfig>;
-    const resolved: EffortModelMap = {
-      fast: {} as Record<AgentType, string>,
-      default: {} as Record<AgentType, string>,
-      detailed: {} as Record<AgentType, string>
-    };
-
-    for (const [agentType, agentConfig] of Object.entries(agentConfigs)) {
-      resolved.fast[agentType as AgentType] = agentConfig.models.fast;
-      resolved.default[agentType as AgentType] = agentConfig.models.default;
-      resolved.detailed[agentType as AgentType] = agentConfig.models.detailed;
-    }
-
-    return resolved;
-  }
-}
 
 // Load default agent configs from persistence
 function loadDefaultAgentConfigs(): Record<AgentType, AgentConfig> {
@@ -358,9 +304,6 @@ function loadDefaultAgentConfigs(): Record<AgentType, AgentConfig> {
   };
 }
 
-
-// Default effort model map (for backward compatibility with tests)
-export const EFFORT_MODEL_MAP: EffortModelMap = resolveEffortModelMap(loadDefaultAgentConfigs());
 
 // Suffix appended to all prompts to ensure agents provide a summary
 const PROMPT_SUFFIX = `
@@ -932,7 +875,6 @@ export class AgentManager {
   private filterByCwd: string | null;
   private cleanupAgeDays: number;
   private defaultMode: Mode;
-  private effortModelMap!: EffortModelMap;
   private agentConfigs!: Record<AgentType, AgentConfig>;
   private constructorAgentConfigs: Record<AgentType, AgentConfig> | null = null;
 
@@ -981,10 +923,8 @@ export class AgentManager {
     // Set defaults if no config provided
     if (!this.constructorAgentConfigs) {
       this.agentConfigs = loadDefaultAgentConfigs();
-      this.effortModelMap = resolveEffortModelMap(this.agentConfigs);
     } else {
       this.agentConfigs = this.constructorAgentConfigs;
-      this.effortModelMap = resolveEffortModelMap(this.constructorAgentConfigs);
     }
 
     await this.loadExistingAgents();
@@ -996,7 +936,6 @@ export class AgentManager {
 
   setModelOverrides(agentConfigs: Record<AgentType, AgentConfig>): void {
     this.agentConfigs = agentConfigs;
-    this.effortModelMap = resolveEffortModelMap(agentConfigs);
   }
 
   private async loadExistingAgents(): Promise<void> {
@@ -1059,16 +998,16 @@ export class AgentManager {
     prompt: string,
     cwd: string | null = null,
     mode: Mode | null = null,
-    effort: EffortLevel = 'default',
     parentSessionId: string | null = null,
     workspaceDir: string | null = null,
-    model: string | null = null
+    model: string | null = null,
+    reasoningEffort: string | null = null
   ): Promise<AgentProcess> {
     await this.initialize();
     const resolvedMode = resolveMode(mode, this.defaultMode);
 
-    // Use explicit model when provided; otherwise resolve from effort level
-    const resolvedModel: string = model?.trim() || this.effortModelMap[effort][agentType];
+    // Use explicit model when provided; otherwise fall back to agent config default
+    const resolvedModel: string = model?.trim() || this.agentConfigs[agentType]?.models?.default || loadDefaultAgentConfigs()[agentType].models.default;
 
     const running = await this.listRunning();
     if (running.length >= this.maxConcurrent) {
@@ -1096,7 +1035,7 @@ export class AgentManager {
     }
 
     const agentId = randomUUID().substring(0, 8);
-    const cmd = this.buildCommand(agentType, prompt, resolvedMode, resolvedModel, resolvedCwd);
+    const cmd = this.buildCommand(agentType, prompt, resolvedMode, resolvedModel, resolvedCwd, reasoningEffort);
 
     const agent = new AgentProcess(
       agentId,
@@ -1214,7 +1153,8 @@ export class AgentManager {
     prompt: string,
     mode: Mode,
     model: string,
-    cwd: string | null = null
+    cwd: string | null = null,
+    reasoningEffort: string | null = null
   ): string[] {
     const isEditMode = mode === 'edit';
 
@@ -1306,6 +1246,16 @@ export class AgentManager {
       cmd.push('--model', model);
     } else if (agentType === 'copilot') {
       cmd.push('--model', model);
+    }
+
+    // Reasoning effort
+    if (reasoningEffort) {
+      if (agentType === 'claude') {
+        cmd.push('--effort', reasoningEffort);
+      } else if (agentType === 'codex') {
+        cmd.push('-c', `model_reasoning_effort="${reasoningEffort}"`);
+      }
+      // gemini, copilot: not supported, ignore silently
     }
 
     if (mode === 'ralph') {
@@ -1432,7 +1382,6 @@ export class AgentManager {
   async reply(
     originalAgent: AgentProcess,
     message: string,
-    effort: EffortLevel = 'default',
     model: string | null = null
   ): Promise<AgentProcess> {
     await this.initialize();
@@ -1480,7 +1429,7 @@ export class AgentManager {
       throw new Error(pathOrError || 'CLI tool not available');
     }
 
-    const resolvedModel: string = model?.trim() || this.effortModelMap[effort][agentType];
+    const resolvedModel: string = model?.trim() || this.agentConfigs[agentType]?.models?.default || loadDefaultAgentConfigs()[agentType].models.default;
     const resolvedMode = originalAgent.mode as Mode;
     const conversationTurn = originalAgent.conversationTurn + 1;
 

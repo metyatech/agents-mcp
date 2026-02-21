@@ -7,13 +7,10 @@ import {
   AgentProcess,
   AgentStatus,
   AGENT_COMMANDS,
-  EFFORT_MODEL_MAP,
-  resolveEffortModelMap,
   resolveMode,
   computePathLCA,
   splitCommandTemplate,
 } from '../src/agents.js';
-import type { EffortLevel } from '../src/agents.js';
 
 const TESTDATA_DIR = path.join(__dirname, 'testdata');
 
@@ -433,108 +430,6 @@ describe('AgentProcess', () => {
   });
 });
 
-describe('Effort Model Mapping', () => {
-  test('should have mappings for all effort levels', () => {
-    expect('fast' in EFFORT_MODEL_MAP).toBe(true);
-    expect('default' in EFFORT_MODEL_MAP).toBe(true);
-    expect('detailed' in EFFORT_MODEL_MAP).toBe(true);
-  });
-
-  test('should have models for all agent types at each effort level', () => {
-    const agentTypes = ['codex', 'cursor', 'gemini', 'claude'] as const;
-    const effortLevels: EffortLevel[] = ['fast', 'default', 'detailed'];
-
-    for (const effort of effortLevels) {
-      for (const agentType of agentTypes) {
-        expect(EFFORT_MODEL_MAP[effort][agentType]).toBeDefined();
-        expect(typeof EFFORT_MODEL_MAP[effort][agentType]).toBe('string');
-        expect(EFFORT_MODEL_MAP[effort][agentType].length).toBeGreaterThan(0);
-      }
-    }
-  });
-
-  test('should have correct fast effort models', () => {
-    expect(EFFORT_MODEL_MAP.fast.codex).toBe('gpt-5.1-codex-mini');
-    expect(EFFORT_MODEL_MAP.fast.gemini).toBe('gemini-3-flash-preview');
-    expect(EFFORT_MODEL_MAP.fast.claude).toBe('claude-haiku-4-5-20251001');
-    expect(EFFORT_MODEL_MAP.fast.cursor).toBe('composer-1');
-  });
-
-  test('should have correct default effort models', () => {
-    expect(EFFORT_MODEL_MAP.default.codex).toBe('gpt-5.3-codex');
-    expect(EFFORT_MODEL_MAP.default.gemini).toBe('gemini-3-flash-preview');
-    expect(EFFORT_MODEL_MAP.default.claude).toBe('claude-sonnet-4-6');
-    expect(EFFORT_MODEL_MAP.default.cursor).toBe('composer-1');
-  });
-
-  test('should have correct detailed effort models', () => {
-    expect(EFFORT_MODEL_MAP.detailed.codex).toBe('gpt-5.3-codex');
-    expect(EFFORT_MODEL_MAP.detailed.gemini).toBe('gemini-3-pro-preview');
-    expect(EFFORT_MODEL_MAP.detailed.claude).toBe('claude-opus-4-6');
-    expect(EFFORT_MODEL_MAP.detailed.cursor).toBe('composer-1');
-  });
-
-  test('cursor should use composer-1 for all effort levels', () => {
-    expect(EFFORT_MODEL_MAP.fast.cursor).toBe('composer-1');
-    expect(EFFORT_MODEL_MAP.default.cursor).toBe('composer-1');
-    expect(EFFORT_MODEL_MAP.detailed.cursor).toBe('composer-1');
-  });
-});
-
-describe('Effort Model Overrides', () => {
-  test('should apply overrides for a specific agent and effort level', () => {
-    const overrides = {
-      codex: {
-        fast: 'gpt-5.2-codex-mini',
-      },
-    };
-
-    const resolved = resolveEffortModelMap(EFFORT_MODEL_MAP, overrides);
-
-    expect(resolved.fast.codex).toBe('gpt-5.2-codex-mini');
-    expect(resolved.default.codex).toBe('gpt-5.3-codex');
-    expect(resolved.detailed.codex).toBe('gpt-5.3-codex');
-  });
-
-  test('should apply multiple level overrides for one agent', () => {
-    const overrides = {
-      claude: {
-        fast: 'claude-haiku-custom',
-        detailed: 'claude-opus-custom',
-      },
-    };
-
-    const resolved = resolveEffortModelMap(EFFORT_MODEL_MAP, overrides);
-
-    expect(resolved.fast.claude).toBe('claude-haiku-custom');
-    expect(resolved.default.claude).toBe(EFFORT_MODEL_MAP.default.claude);
-    expect(resolved.detailed.claude).toBe('claude-opus-custom');
-  });
-
-  test('should ignore empty model strings', () => {
-    const overrides = {
-      gemini: {
-        fast: '',
-      },
-    };
-
-    const resolved = resolveEffortModelMap(EFFORT_MODEL_MAP, overrides);
-
-    expect(resolved.fast.gemini).toBe('gemini-3-flash-preview');
-  });
-
-  test('should ignore unknown agent types', () => {
-    const overrides = {};
-
-    const resolved = resolveEffortModelMap(EFFORT_MODEL_MAP, overrides);
-
-    expect(resolved.fast.codex).toBe('gpt-5.1-codex-mini');
-    expect(resolved.fast.gemini).toBe('gemini-3-flash-preview');
-    expect(resolved.fast.claude).toBe('claude-haiku-4-5-20251001');
-    expect(resolved.fast.cursor).toBe('composer-1');
-  });
-});
-
 describe('AgentCommands', () => {
   test('should have commands for all agent types', () => {
     expect('codex' in AGENT_COMMANDS).toBe(true);
@@ -557,6 +452,57 @@ describe('AgentCommands', () => {
     expect(cmd).toContain('--json');
     // --full-auto is only added in edit mode, not in plan mode base command
     expect(cmd).not.toContain('--full-auto');
+  });
+});
+
+describe('Reasoning Effort CLI flags', () => {
+  let manager: AgentManager;
+  let testDir: string;
+
+  beforeEach(async () => {
+    testDir = path.join(tmpdir(), `effort_tests_${Date.now()}`);
+    await fs.mkdir(testDir, { recursive: true });
+    manager = new AgentManager(5, 10, testDir);
+    await manager['initialize']();
+    manager['agents'].clear();
+  });
+
+  afterEach(async () => {
+    try { await fs.rm(testDir, { recursive: true }); } catch {}
+  });
+
+  test('claude with reasoningEffort appends --effort flag', () => {
+    const cmd = manager['buildCommand']('claude', 'test prompt', 'plan', 'claude-sonnet-4-6', null, 'high');
+    expect(cmd).toContain('--effort');
+    expect(cmd[cmd.indexOf('--effort') + 1]).toBe('high');
+  });
+
+  test('codex with reasoningEffort appends -c model_reasoning_effort', () => {
+    const cmd = manager['buildCommand']('codex', 'test prompt', 'plan', 'gpt-5.3-codex', null, 'medium');
+    expect(cmd).toContain('-c');
+    const idx = cmd.indexOf('-c');
+    expect(cmd[idx + 1]).toBe('model_reasoning_effort="medium"');
+  });
+
+  test('gemini with reasoningEffort ignores it silently', () => {
+    const cmd = manager['buildCommand']('gemini', 'test prompt', 'plan', 'gemini-3-flash-preview', null, 'high');
+    expect(cmd).not.toContain('--effort');
+    const hasMre = cmd.some(a => a.includes('model_reasoning_effort'));
+    expect(hasMre).toBe(false);
+  });
+
+  test('copilot with reasoningEffort ignores it silently', () => {
+    const cmd = manager['buildCommand']('copilot', 'test prompt', 'plan', 'claude-sonnet-4.5', null, 'low');
+    expect(cmd).not.toContain('--effort');
+    const hasMre = cmd.some(a => a.includes('model_reasoning_effort'));
+    expect(hasMre).toBe(false);
+  });
+
+  test('null reasoningEffort adds no extra flags for claude', () => {
+    const cmdWith = manager['buildCommand']('claude', 'test prompt', 'plan', 'claude-sonnet-4-6', null, 'low');
+    const cmdWithout = manager['buildCommand']('claude', 'test prompt', 'plan', 'claude-sonnet-4-6', null, null);
+    expect(cmdWith.length).toBeGreaterThan(cmdWithout.length);
+    expect(cmdWithout).not.toContain('--effort');
   });
 });
 

@@ -129,8 +129,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         },
                         effort: {
                             type: 'string',
-                            enum: ['fast', 'default', 'detailed'],
-                            description: "Effort level: 'fast' is quickest/cheapest, 'default' is balanced (default), 'detailed' is max-capability. Ignored when 'model' is specified.",
+                            description: "Reasoning effort level passed to the agent CLI. For Claude: --effort <value> (e.g. low/medium/high). For Codex: -c model_reasoning_effort=\"<value>\". Gemini and Copilot do not support this and will ignore it.",
                         },
                         model: {
                             type: 'string',
@@ -169,6 +168,14 @@ CURSOR SUPPORT: Send 'since' parameter (ISO timestamp from previous response's '
                         since: {
                             type: 'string',
                             description: 'Optional ISO timestamp - return only events after this time. Use cursor from previous response to get delta updates.',
+                        },
+                        wait: {
+                            type: 'boolean',
+                            description: 'Block until all agents in the task are no longer running, or timeout is reached.',
+                        },
+                        timeout: {
+                            type: 'number',
+                            description: 'Max wait time in milliseconds when wait=true. Defaults to 60000 (60s). Max 600000 (10min).',
                         },
                     },
                     required: ['task_name'],
@@ -256,13 +263,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
             const parentSessionId = getParentSessionIdFromEnv();
             const workspaceDir = getWorkspaceFromEnv();
-            result = await handleSpawn(manager, args.task_name, args.agent_type, args.prompt, args.cwd || null, args.mode || null, args.effort || 'default', parentSessionId, workspaceDir, args.model || null);
+            result = await handleSpawn(manager, args.task_name, args.agent_type, args.prompt, args.cwd || null, args.mode || null, parentSessionId, workspaceDir, args.model || null, args.effort || null);
         }
         else if (normalizedName === 'status') {
             if (!args) {
                 throw new Error('Missing arguments for status');
             }
-            result = await handleStatus(manager, args.task_name || null, args.filter, args.since, args.parent_session_id || null);
+            result = await handleStatus(manager, args.task_name || null, args.filter, args.since, args.parent_session_id || null, args.wait, args.timeout);
         }
         else if (normalizedName === 'stop') {
             if (!args) {

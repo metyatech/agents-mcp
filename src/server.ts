@@ -153,8 +153,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             effort: {
               type: 'string',
-              enum: ['fast', 'default', 'detailed'],
-              description: "Effort level: 'fast' is quickest/cheapest, 'default' is balanced (default), 'detailed' is max-capability. Ignored when 'model' is specified.",
+              description: "Reasoning effort level passed to the agent CLI. For Claude: --effort <value> (e.g. low/medium/high). For Codex: -c model_reasoning_effort=\"<value>\". Gemini and Copilot do not support this and will ignore it.",
             },
             model: {
               type: 'string',
@@ -298,10 +297,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         args.prompt as string,
         (args.cwd as string) || null,
         (args.mode as string) || null,
-        (args.effort as 'fast' | 'default' | 'detailed') || 'default',
         parentSessionId,
         workspaceDir,
-        (args.model as string) || null
+        (args.model as string) || null,
+        (args.effort as string) || null
       );
     } else if (normalizedName === 'status') {
       if (!args) {

@@ -47,11 +47,10 @@ function extractErrorLinesFromTail(lines, maxItems = 3) {
     });
     return matches.slice(-Math.max(0, maxItems));
 }
-export async function handleSpawn(manager, taskName, agentType, prompt, cwd, mode, effort = 'default', parentSessionId = null, workspaceDir = null, model = null) {
+export async function handleSpawn(manager, taskName, agentType, prompt, cwd, mode, parentSessionId = null, workspaceDir = null, model = null, effort = null) {
     const defaultMode = manager.getDefaultMode();
     const resolvedMode = resolveMode(mode, defaultMode);
-    const resolvedEffort = effort ?? 'default';
-    console.error(`[spawn] Spawning ${agentType} agent for task "${taskName}" [${resolvedMode}] effort=${resolvedEffort}${model ? ` model=${model}` : ''}...`);
+    console.error(`[spawn] Spawning ${agentType} agent for task "${taskName}" [${resolvedMode}]${effort ? ` effort=${effort}` : ''}${model ? ` model=${model}` : ''}...`);
     // Ralph mode special handling
     if (resolvedMode === 'ralph') {
         if (!cwd) {
@@ -76,7 +75,7 @@ export async function handleSpawn(manager, taskName, agentType, prompt, cwd, mod
         // Build the ralph instruction prompt
         const ralphPrompt = buildRalphPrompt(prompt, ralphFilePath);
         // Spawn agent with ralph prompt and ralph mode (full permissions)
-        const agent = await manager.spawn(taskName, agentType, ralphPrompt, cwd, resolvedMode, resolvedEffort, parentSessionId, workspaceDir, model);
+        const agent = await manager.spawn(taskName, agentType, ralphPrompt, cwd, resolvedMode, parentSessionId, workspaceDir, model, effort);
         console.error(`[ralph] Spawned ${agentType} agent ${agent.agentId} for autonomous execution`);
         return {
             task_name: taskName,
@@ -87,7 +86,7 @@ export async function handleSpawn(manager, taskName, agentType, prompt, cwd, mod
         };
     }
     // Regular spawn logic (plan/edit modes)
-    const agent = await manager.spawn(taskName, agentType, prompt, cwd, resolvedMode, resolvedEffort, parentSessionId, workspaceDir, model);
+    const agent = await manager.spawn(taskName, agentType, prompt, cwd, resolvedMode, parentSessionId, workspaceDir, model, effort);
     console.error(`[spawn] Spawned ${agentType} agent ${agent.agentId} for task "${taskName}"`);
     return {
         task_name: taskName,
@@ -97,19 +96,7 @@ export async function handleSpawn(manager, taskName, agentType, prompt, cwd, mod
         started_at: agent.startedAt.toISOString(),
     };
 }
-export async function handleStatus(manager, taskName, filter, since, // Optional ISO timestamp - return only events after this time
-parentSessionId) {
-    // Default to 'all' so callers see completed/failed agents unless they opt to filter
-    const effectiveFilter = filter || 'all';
-    const normalizedTaskName = taskName?.trim() || '';
-    const normalizedParentSessionId = parentSessionId?.trim() || '';
-    if (!normalizedTaskName && !normalizedParentSessionId) {
-        throw new Error('task_name is required when parent_session_id is not provided');
-    }
-    const lookupLabel = normalizedParentSessionId && !normalizedTaskName
-        ? `parent_session_id "${normalizedParentSessionId}"`
-        : `task "${normalizedTaskName}"`;
-    console.error(`[status] Getting status for agents in ${lookupLabel} (filter=${effectiveFilter})...`);
+async function collectStatus(manager, normalizedTaskName, normalizedParentSessionId, effectiveFilter, since) {
     const allAgents = normalizedParentSessionId && !normalizedTaskName
         ? await manager.listByParentSession(normalizedParentSessionId)
         : await manager.listByTask(normalizedTaskName);
@@ -185,13 +172,48 @@ parentSessionId) {
             session_id: agent.sessionId,
         });
     }
-    console.error(`[status] ${lookupLabel}: returning ${agents.length}/${allAgents.length} agents (running=${counts.running}, completed=${counts.completed}, failed=${counts.failed}, stopped=${counts.stopped})`);
     return {
         task_name: normalizedTaskName,
         agents: agentStatuses,
         summary: counts,
-        cursor: maxTimestamp, // Max timestamp across all agents
+        cursor: maxTimestamp,
     };
+}
+const WAIT_POLL_INTERVAL_MS = 1000;
+const WAIT_DEFAULT_TIMEOUT_MS = 60_000;
+const WAIT_MAX_TIMEOUT_MS = 600_000;
+export async function handleStatus(manager, taskName, filter, since, // Optional ISO timestamp - return only events after this time
+parentSessionId, wait, timeout) {
+    // Default to 'all' so callers see completed/failed agents unless they opt to filter
+    const effectiveFilter = filter || 'all';
+    const normalizedTaskName = taskName?.trim() || '';
+    const normalizedParentSessionId = parentSessionId?.trim() || '';
+    if (!normalizedTaskName && !normalizedParentSessionId) {
+        throw new Error('task_name is required when parent_session_id is not provided');
+    }
+    const lookupLabel = normalizedParentSessionId && !normalizedTaskName
+        ? `parent_session_id "${normalizedParentSessionId}"`
+        : `task "${normalizedTaskName}"`;
+    console.error(`[status] Getting status for agents in ${lookupLabel} (filter=${effectiveFilter}${wait ? `, wait=true, timeout=${timeout ?? WAIT_DEFAULT_TIMEOUT_MS}ms` : ''})...`);
+    let result = await collectStatus(manager, normalizedTaskName, normalizedParentSessionId, effectiveFilter, since);
+    if (wait && result.summary.running > 0) {
+        const effectiveTimeout = Math.min(timeout ?? WAIT_DEFAULT_TIMEOUT_MS, WAIT_MAX_TIMEOUT_MS);
+        const deadline = Date.now() + effectiveTimeout;
+        console.error(`[status] Waiting for running agents (deadline in ${effectiveTimeout}ms)...`);
+        while (result.summary.running > 0 && Date.now() < deadline) {
+            await new Promise(resolve => setTimeout(resolve, WAIT_POLL_INTERVAL_MS));
+            result = await collectStatus(manager, normalizedTaskName, normalizedParentSessionId, effectiveFilter, since);
+        }
+        if (result.summary.running > 0) {
+            console.error(`[status] Wait timed out after ${effectiveTimeout}ms with ${result.summary.running} agent(s) still running`);
+            result.timed_out = true;
+        }
+        else {
+            console.error(`[status] All agents finished within wait period`);
+        }
+    }
+    console.error(`[status] ${lookupLabel}: returning ${result.agents.length} agents (running=${result.summary.running}, completed=${result.summary.completed}, failed=${result.summary.failed}, stopped=${result.summary.stopped})`);
+    return result;
 }
 export async function handleTasks(manager, limit = 10) {
     console.error(`[tasks] Listing tasks (limit=${limit})...`);

@@ -229,50 +229,6 @@ export const AGENT_COMMANDS = {
     opencode: ['opencode', 'run', '--format', 'json', '{prompt}'],
     copilot: ['copilot', '-p', '{prompt}', '-s'],
 };
-// Build effort model map from agent configs
-export function resolveEffortModelMap(baseOrAgentConfigs, overrides) {
-    // Check if first arg is base EffortModelMap (old API) or agent configs (new API)
-    const hasBaseOverrides = arguments.length > 1;
-    if (hasBaseOverrides && overrides) {
-        // Old API: resolveEffortModelMap(base, overrides)
-        const base = baseOrAgentConfigs;
-        const resolved = {
-            fast: { ...base.fast },
-            default: { ...base.default },
-            detailed: { ...base.detailed }
-        };
-        for (const [agentType, effortOverrides] of Object.entries(overrides)) {
-            if (!effortOverrides)
-                continue;
-            const typedAgent = agentType;
-            for (const level of ['fast', 'default', 'detailed']) {
-                const model = effortOverrides[level];
-                if (typeof model === 'string') {
-                    const trimmed = model.trim();
-                    if (trimmed) {
-                        resolved[level][typedAgent] = trimmed;
-                    }
-                }
-            }
-        }
-        return resolved;
-    }
-    else {
-        // New API: resolveEffortModelMap(agentConfigs)
-        const agentConfigs = baseOrAgentConfigs;
-        const resolved = {
-            fast: {},
-            default: {},
-            detailed: {}
-        };
-        for (const [agentType, agentConfig] of Object.entries(agentConfigs)) {
-            resolved.fast[agentType] = agentConfig.models.fast;
-            resolved.default[agentType] = agentConfig.models.default;
-            resolved.detailed[agentType] = agentConfig.models.detailed;
-        }
-        return resolved;
-    }
-}
 // Load default agent configs from persistence
 function loadDefaultAgentConfigs() {
     // Use hardcoded defaults for backward compatibility with synchronous initialization
@@ -341,8 +297,6 @@ function loadDefaultAgentConfigs() {
         }
     };
 }
-// Default effort model map (for backward compatibility with tests)
-export const EFFORT_MODEL_MAP = resolveEffortModelMap(loadDefaultAgentConfigs());
 // Suffix appended to all prompts to ensure agents provide a summary
 const PROMPT_SUFFIX = `
 
@@ -836,7 +790,6 @@ export class AgentManager {
     filterByCwd;
     cleanupAgeDays;
     defaultMode;
-    effortModelMap;
     agentConfigs;
     constructorAgentConfigs = null;
     constructorAgentsDir = null;
@@ -870,11 +823,9 @@ export class AgentManager {
         // Set defaults if no config provided
         if (!this.constructorAgentConfigs) {
             this.agentConfigs = loadDefaultAgentConfigs();
-            this.effortModelMap = resolveEffortModelMap(this.agentConfigs);
         }
         else {
             this.agentConfigs = this.constructorAgentConfigs;
-            this.effortModelMap = resolveEffortModelMap(this.constructorAgentConfigs);
         }
         await this.loadExistingAgents();
     }
@@ -883,7 +834,6 @@ export class AgentManager {
     }
     setModelOverrides(agentConfigs) {
         this.agentConfigs = agentConfigs;
-        this.effortModelMap = resolveEffortModelMap(agentConfigs);
     }
     async loadExistingAgents() {
         try {
@@ -935,11 +885,11 @@ export class AgentManager {
         }
         console.error(`Loaded ${loadedCount} agents from disk`);
     }
-    async spawn(taskName, agentType, prompt, cwd = null, mode = null, effort = 'default', parentSessionId = null, workspaceDir = null, model = null) {
+    async spawn(taskName, agentType, prompt, cwd = null, mode = null, parentSessionId = null, workspaceDir = null, model = null, reasoningEffort = null) {
         await this.initialize();
         const resolvedMode = resolveMode(mode, this.defaultMode);
-        // Use explicit model when provided; otherwise resolve from effort level
-        const resolvedModel = model?.trim() || this.effortModelMap[effort][agentType];
+        // Use explicit model when provided; otherwise fall back to agent config default
+        const resolvedModel = model?.trim() || this.agentConfigs[agentType]?.models?.default || loadDefaultAgentConfigs()[agentType].models.default;
         const running = await this.listRunning();
         if (running.length >= this.maxConcurrent) {
             throw new Error(`Maximum concurrent agents (${this.maxConcurrent}) reached. Wait for an agent to complete or stop one first.`);
@@ -961,7 +911,7 @@ export class AgentManager {
             }
         }
         const agentId = randomUUID().substring(0, 8);
-        const cmd = this.buildCommand(agentType, prompt, resolvedMode, resolvedModel, resolvedCwd);
+        const cmd = this.buildCommand(agentType, prompt, resolvedMode, resolvedModel, resolvedCwd, reasoningEffort);
         const agent = new AgentProcess(agentId, taskName, agentType, prompt, resolvedCwd, resolvedMode, null, AgentStatus.RUNNING, new Date(), null, this.agentsDir, parentSessionId, workspaceDir);
         const agentDir = await agent.getAgentDir();
         try {
@@ -1049,7 +999,7 @@ export class AgentManager {
         console.error(`Spawned agent ${agentId} with PID ${agent.pid}`);
         return agent;
     }
-    buildCommand(agentType, prompt, mode, model, cwd = null) {
+    buildCommand(agentType, prompt, mode, model, cwd = null, reasoningEffort = null) {
         const isEditMode = mode === 'edit';
         // Build the full prompt with prefix (for plan mode) and suffix
         let fullPrompt = prompt + PROMPT_SUFFIX;
@@ -1133,6 +1083,16 @@ export class AgentManager {
         }
         else if (agentType === 'copilot') {
             cmd.push('--model', model);
+        }
+        // Reasoning effort
+        if (reasoningEffort) {
+            if (agentType === 'claude') {
+                cmd.push('--effort', reasoningEffort);
+            }
+            else if (agentType === 'codex') {
+                cmd.push('-c', `model_reasoning_effort="${reasoningEffort}"`);
+            }
+            // gemini, copilot: not supported, ignore silently
         }
         if (mode === 'ralph') {
             cmd = this.applyRalphMode(agentType, cmd);
@@ -1233,7 +1193,7 @@ export class AgentManager {
                 throw new Error(`Reply is not supported for agent type '${agentType}'. Supported: claude, gemini, copilot`);
         }
     }
-    async reply(originalAgent, message, effort = 'default', model = null) {
+    async reply(originalAgent, message, model = null) {
         await this.initialize();
         // Re-fetch canonical instance from the agents map to avoid stale references
         const canonical = this.agents.get(originalAgent.agentId);
@@ -1262,7 +1222,7 @@ export class AgentManager {
         if (!available) {
             throw new Error(pathOrError || 'CLI tool not available');
         }
-        const resolvedModel = model?.trim() || this.effortModelMap[effort][agentType];
+        const resolvedModel = model?.trim() || this.agentConfigs[agentType]?.models?.default || loadDefaultAgentConfigs()[agentType].models.default;
         const resolvedMode = originalAgent.mode;
         const conversationTurn = originalAgent.conversationTurn + 1;
         const cmd = this.buildReplyCommand(agentType, message, originalAgent.sessionId, resolvedMode, resolvedModel, originalAgent.cwd);

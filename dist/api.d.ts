@@ -55,6 +55,7 @@ export interface TaskStatusResult {
         stopped: number;
     };
     cursor: string;
+    timed_out?: boolean;
 }
 export interface StopResult {
     task_name: string;
@@ -76,9 +77,9 @@ export interface TaskInfo {
 export interface TasksResult {
     tasks: TaskInfo[];
 }
-export declare function handleSpawn(manager: AgentManager, taskName: string, agentType: AgentType, prompt: string, cwd: string | null, mode: string | null, effort?: 'fast' | 'default' | 'detailed' | null, parentSessionId?: string | null, workspaceDir?: string | null, model?: string | null): Promise<SpawnResult>;
+export declare function handleSpawn(manager: AgentManager, taskName: string, agentType: AgentType, prompt: string, cwd: string | null, mode: string | null, parentSessionId?: string | null, workspaceDir?: string | null, model?: string | null, effort?: string | null): Promise<SpawnResult>;
 export declare function handleStatus(manager: AgentManager, taskName: string | null | undefined, filter?: string, since?: string, // Optional ISO timestamp - return only events after this time
-parentSessionId?: string | null): Promise<TaskStatusResult>;
+parentSessionId?: string | null, wait?: boolean, timeout?: number): Promise<TaskStatusResult>;
 export declare function handleTasks(manager: AgentManager, limit?: number): Promise<TasksResult>;
 export declare function handleStop(manager: AgentManager, taskName: string, agentId?: string): Promise<StopResult | {
     error: string;
