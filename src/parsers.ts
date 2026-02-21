@@ -1,6 +1,6 @@
 import { extractFileOpsFromBash } from './file_ops.js';
 
-export type AgentType = 'codex' | 'gemini' | 'cursor' | 'claude' | 'opencode';
+export type AgentType = 'codex' | 'gemini' | 'cursor' | 'claude' | 'opencode' | 'copilot';
 
 const claudeToolUseMap = new Map<string, { tool: string; command?: string; path?: string }>();
 
@@ -15,6 +15,8 @@ export function normalizeEvents(agentType: AgentType, raw: any): any[] {
     return normalizeClaude(raw);
   } else if (agentType === 'opencode') {
     return normalizeOpencode(raw);
+  } else if (agentType === 'copilot') {
+    return normalizeCopilot(raw);
   }
 
   const timestamp = new Date().toISOString();
@@ -836,6 +838,49 @@ function normalizeOpencode(raw: any): any[] {
   return [{
     type: eventType,
     agent: 'opencode',
+    raw: raw,
+    timestamp: timestamp,
+  }];
+}
+
+// --- Copilot parsing ---
+// Copilot CLI currently outputs plain text only (no JSON/stream-json mode).
+// Non-JSON lines are handled in readNewEvents() as message events.
+// This normalizer is a future-proof stub for when copilot gains structured output.
+
+function normalizeCopilot(raw: any): any[] {
+  if (!raw || typeof raw !== 'object') {
+    return [{
+      type: 'unknown',
+      agent: 'copilot',
+      raw: raw,
+      timestamp: new Date().toISOString(),
+    }];
+  }
+
+  const eventType = raw?.type || 'unknown';
+  const timestamp = raw?.timestamp || new Date().toISOString();
+
+  if (eventType === 'message') {
+    return [{
+      type: 'message',
+      agent: 'copilot',
+      content: raw?.content || '',
+      complete: true,
+      timestamp: timestamp,
+    }];
+  } else if (eventType === 'result') {
+    return [{
+      type: 'result',
+      agent: 'copilot',
+      status: raw?.status || 'success',
+      timestamp: timestamp,
+    }];
+  }
+
+  return [{
+    type: eventType,
+    agent: 'copilot',
     raw: raw,
     timestamp: timestamp,
   }];

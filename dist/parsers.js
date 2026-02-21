@@ -16,6 +16,9 @@ export function normalizeEvents(agentType, raw) {
     else if (agentType === 'opencode') {
         return normalizeOpencode(raw);
     }
+    else if (agentType === 'copilot') {
+        return normalizeCopilot(raw);
+    }
     const timestamp = new Date().toISOString();
     return [{
             type: raw.type || 'unknown',
@@ -810,6 +813,45 @@ function normalizeOpencode(raw) {
     return [{
             type: eventType,
             agent: 'opencode',
+            raw: raw,
+            timestamp: timestamp,
+        }];
+}
+// --- Copilot parsing ---
+// Copilot CLI currently outputs plain text only (no JSON/stream-json mode).
+// Non-JSON lines are handled in readNewEvents() as message events.
+// This normalizer is a future-proof stub for when copilot gains structured output.
+function normalizeCopilot(raw) {
+    if (!raw || typeof raw !== 'object') {
+        return [{
+                type: 'unknown',
+                agent: 'copilot',
+                raw: raw,
+                timestamp: new Date().toISOString(),
+            }];
+    }
+    const eventType = raw?.type || 'unknown';
+    const timestamp = raw?.timestamp || new Date().toISOString();
+    if (eventType === 'message') {
+        return [{
+                type: 'message',
+                agent: 'copilot',
+                content: raw?.content || '',
+                complete: true,
+                timestamp: timestamp,
+            }];
+    }
+    else if (eventType === 'result') {
+        return [{
+                type: 'result',
+                agent: 'copilot',
+                status: raw?.status || 'success',
+                timestamp: timestamp,
+            }];
+    }
+    return [{
+            type: eventType,
+            agent: 'copilot',
             raw: raw,
             timestamp: timestamp,
         }];

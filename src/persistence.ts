@@ -5,7 +5,7 @@ import { constants as fsConstants } from 'fs';
 import { AgentType } from './parsers.js';
 
 // All supported swarm agent types
-const ALL_AGENTS: AgentType[] = ['claude', 'codex', 'gemini', 'cursor', 'opencode'];
+const ALL_AGENTS: AgentType[] = ['claude', 'codex', 'gemini', 'cursor', 'opencode', 'copilot'];
 
 // Swarm data lives under ~/.agents/swarm/
 const SWARM_DIR = path.join(homedir(), '.agents', 'swarm');
@@ -170,6 +170,16 @@ function getDefaultAgentConfig(agentType: AgentType): AgentConfig {
         detailed: 'zai-coding-plan/glm-4.7'
       },
       provider: 'custom'
+    },
+    copilot: {
+      command: 'copilot -p \'{prompt}\' -s',
+      enabled: true,
+      models: {
+        fast: 'claude-sonnet-4',
+        default: 'claude-sonnet-4.5',
+        detailed: 'gpt-5'
+      },
+      provider: 'github'
     }
   };
 
@@ -190,6 +200,9 @@ function getDefaultProviderConfig(): Record<string, ProviderConfig> {
     },
     custom: {
       apiEndpoint: null
+    },
+    github: {
+      apiEndpoint: 'https://api.github.com'
     }
   };
 }

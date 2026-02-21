@@ -51,6 +51,7 @@ const agentDescriptions: Record<AgentType, string> = {
   claude: 'Maximum capability, research, exploration.',
   gemini: 'Complex multi-system features, architectural changes.',
   opencode: 'Open source coding agent. Provider-agnostic, TUI-focused.',
+  copilot: 'GitHub Copilot CLI. General-purpose coding agent with GitHub integration.',
 };
 
 function withVersionNotice(description: string): string {

@@ -3,7 +3,7 @@ import * as path from 'path';
 import { homedir, tmpdir } from 'os';
 import { constants as fsConstants } from 'fs';
 // All supported swarm agent types
-const ALL_AGENTS = ['claude', 'codex', 'gemini', 'cursor', 'opencode'];
+const ALL_AGENTS = ['claude', 'codex', 'gemini', 'cursor', 'opencode', 'copilot'];
 // Swarm data lives under ~/.agents/swarm/
 const SWARM_DIR = path.join(homedir(), '.agents', 'swarm');
 // Legacy paths (for migration)
@@ -122,6 +122,16 @@ function getDefaultAgentConfig(agentType) {
                 detailed: 'zai-coding-plan/glm-4.7'
             },
             provider: 'custom'
+        },
+        copilot: {
+            command: 'copilot -p \'{prompt}\' -s',
+            enabled: true,
+            models: {
+                fast: 'claude-sonnet-4',
+                default: 'claude-sonnet-4.5',
+                detailed: 'gpt-5'
+            },
+            provider: 'github'
         }
     };
     return defaults[agentType];
@@ -140,6 +150,9 @@ function getDefaultProviderConfig() {
         },
         custom: {
             apiEndpoint: null
+        },
+        github: {
+            apiEndpoint: 'https://api.github.com'
         }
     };
 }

@@ -185,6 +185,8 @@ function isCompatibleAgentCli(agentType, firstArg) {
             return exe === 'cursor-agent' || exe === 'cursor-agent.exe';
         case 'opencode':
             return exe === 'opencode' || exe === 'opencode.exe';
+        case 'copilot':
+            return exe === 'copilot' || exe === 'copilot.exe';
         default:
             return false;
     }
@@ -222,6 +224,7 @@ export const AGENT_COMMANDS = {
     gemini: ['gemini', '-p', '{prompt}', '--output-format', 'stream-json'],
     claude: ['claude', '-p', '--verbose', '{prompt}', '--output-format', 'stream-json', '--permission-mode', 'plan'],
     opencode: ['opencode', 'run', '--format', 'json', '{prompt}'],
+    copilot: ['copilot', '-p', '{prompt}', '-s'],
 };
 // Build effort model map from agent configs
 export function resolveEffortModelMap(baseOrAgentConfigs, overrides) {
@@ -322,6 +325,16 @@ function loadDefaultAgentConfigs() {
                 detailed: 'zai-coding-plan/glm-4.7'
             },
             provider: 'custom'
+        },
+        copilot: {
+            command: 'copilot -p \'{prompt}\' -s',
+            enabled: true,
+            models: {
+                fast: 'claude-sonnet-4',
+                default: 'claude-sonnet-4.5',
+                detailed: 'gpt-5'
+            },
+            provider: 'github'
         }
     };
 }
@@ -657,11 +670,24 @@ export class AgentProcess {
                             line.includes('conpty_console_list_agent') ||
                             (line.includes('@lydell') && line.includes('node-pty')));
                     if (!isGeminiWin32Noise) {
-                        this.eventsCache.push({
-                            type: 'raw',
-                            content: line,
-                            timestamp: fallbackTimestamp,
-                        });
+                        // Copilot CLI outputs plain text (no JSON mode).
+                        // Emit as 'message' events so the summarizer can surface them in status.
+                        if (this.agentType === 'copilot') {
+                            this.eventsCache.push({
+                                type: 'message',
+                                agent: 'copilot',
+                                content: line,
+                                complete: true,
+                                timestamp: fallbackTimestamp,
+                            });
+                        }
+                        else {
+                            this.eventsCache.push({
+                                type: 'raw',
+                                content: line,
+                                timestamp: fallbackTimestamp,
+                            });
+                        }
                     }
                 }
             }
@@ -1057,6 +1083,9 @@ export class AgentManager {
             }
             cmd.push('--model', model);
         }
+        else if (agentType === 'copilot') {
+            cmd.push('--model', model);
+        }
         if (mode === 'ralph') {
             cmd = this.applyRalphMode(agentType, cmd);
         }
@@ -1084,6 +1113,9 @@ export class AgentManager {
                     editCmd[permModeIndex + 1] = 'acceptEdits';
                 }
                 break;
+            case 'copilot':
+                editCmd.push('--allow-all-tools', '--allow-all-paths', '--no-ask-user');
+                break;
         }
         return editCmd;
     }
@@ -1106,6 +1138,9 @@ export class AgentManager {
                     ralphCmd.splice(permModeIndex, 2); // Remove --permission-mode and its value
                 }
                 ralphCmd.push('--dangerously-skip-permissions');
+                break;
+            case 'copilot':
+                ralphCmd.push('--yolo');
                 break;
         }
         return ralphCmd;
