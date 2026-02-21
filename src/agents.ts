@@ -106,7 +106,7 @@ export function buildWindowsSpawnPs1(cmd: string[], stdoutPath: string, workingD
     // Append a JSON sentinel line with the real exit code so readNewEvents() can
     // determine the correct COMPLETED/FAILED status without guessing.
     `$exitJson = '{"__exit_code__":' + $p.ExitCode.ToString() + '}'`,
-    `[System.IO.File]::WriteAllText('${psEsc(stdoutPath)}', $outTask.Result + $errTask.Result + \`n + $exitJson + \`n, $enc)`,
+    `[System.IO.File]::WriteAllText('${psEsc(stdoutPath)}', $outTask.Result + $errTask.Result + [Environment]::NewLine + $exitJson + [Environment]::NewLine, $enc)`,
   ];
 
   return psLines.join('\n');
