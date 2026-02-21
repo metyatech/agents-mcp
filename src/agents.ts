@@ -300,7 +300,7 @@ function loadDefaultAgentConfigs(): Record<AgentType, AgentConfig> {
     codex: {
       // Note: gpt-5.3 (general GPT) and gpt-5.3-codex (coding-optimized) are distinct models.
       // Use gpt-5.3-codex for code/execution tasks; gpt-5.3 via explicit model param for general reasoning.
-      command: 'codex exec --sandbox workspace-write \'{prompt}\' --json',
+      command: 'codex exec --sandbox danger-full-access \'{prompt}\' --json',
       enabled: true,
       models: {
         fast: 'gpt-5.1-codex-mini',

@@ -132,7 +132,7 @@ function getDefaultAgentConfig(agentType: AgentType): AgentConfig {
       provider: 'anthropic'
     },
     codex: {
-      command: 'codex exec --dangerously-bypass-approvals-and-sandbox \'{prompt}\' --json',
+      command: 'codex exec --sandbox danger-full-access \'{prompt}\' --json',
       enabled: true,
       models: {
         fast: 'gpt-4o-mini',
