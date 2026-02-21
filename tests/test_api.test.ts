@@ -8,7 +8,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { tmpdir } from 'os';
 import { AgentManager, AgentProcess, AgentStatus, checkCliAvailable } from '../src/agents.js';
-import { handleSpawn, handleStatus, handleStop, handleTasks } from '../src/api.js';
+import { handleSpawn, handleStatus, handleStop, handleTasks, handleReply } from '../src/api.js';
 
 describe('API Integration Tests', () => {
   let manager: AgentManager;
@@ -909,6 +909,213 @@ Write a summary of completed tasks.
       expect(prompt).toContain('## [x]');
 
       console.log(`Generated ralph prompt (${prompt.length} chars)`);
+    });
+  });
+
+  describe('handleReply', () => {
+    test('should reject nonexistent agent', async () => {
+      console.log('\n--- TEST: reply to nonexistent agent ---');
+
+      let error: any = null;
+      try {
+        await handleReply(manager, 'nonexistent-agent', 'follow up');
+      } catch (err: any) {
+        error = err;
+      }
+
+      expect(error).toBeTruthy();
+      expect(error.message).toContain('not found');
+    });
+
+    test('should reject unsupported agent type (codex)', async () => {
+      console.log('\n--- TEST: reply to unsupported agent type ---');
+
+      const agent = new AgentProcess(
+        'codex-reply-test',
+        'reply-task',
+        'codex',
+        'original prompt',
+        null,
+        'plan',
+        null,
+        AgentStatus.COMPLETED,
+        new Date(),
+        new Date()
+      );
+      manager['agents'].set('codex-reply-test', agent);
+
+      let error: any = null;
+      try {
+        await handleReply(manager, 'codex-reply-test', 'follow up');
+      } catch (err: any) {
+        error = err;
+      }
+
+      expect(error).toBeTruthy();
+      expect(error.message).toMatch(/not supported/i);
+      expect(error.message).toContain('codex');
+    });
+
+    test('should reject running agent', async () => {
+      console.log('\n--- TEST: reply to running agent ---');
+
+      const agent = new AgentProcess(
+        'running-reply-test',
+        'reply-task',
+        'claude',
+        'original prompt',
+        null,
+        'plan',
+        null,
+        AgentStatus.RUNNING
+      );
+      manager['agents'].set('running-reply-test', agent);
+
+      let error: any = null;
+      try {
+        await handleReply(manager, 'running-reply-test', 'follow up');
+      } catch (err: any) {
+        error = err;
+      }
+
+      expect(error).toBeTruthy();
+      expect(error.message).toContain('still running');
+    });
+
+    test('should reject agent without session_id (claude)', async () => {
+      console.log('\n--- TEST: reply to agent without session_id ---');
+
+      const agent = new AgentProcess(
+        'no-session-test',
+        'reply-task',
+        'claude',
+        'original prompt',
+        null,
+        'plan',
+        null,
+        AgentStatus.COMPLETED,
+        new Date(),
+        new Date(),
+        testDir,
+        null,
+        null,
+        null  // no session_id
+      );
+      manager['agents'].set('no-session-test', agent);
+
+      // Create agent dir and empty stdout so readNewEvents doesn't crash
+      const agentDir = path.join(testDir, 'no-session-test');
+      await fs.mkdir(agentDir, { recursive: true });
+      await fs.writeFile(path.join(agentDir, 'stdout.log'), '');
+
+      let error: any = null;
+      try {
+        await handleReply(manager, 'no-session-test', 'follow up');
+      } catch (err: any) {
+        error = err;
+      }
+
+      expect(error).toBeTruthy();
+      expect(error.message).toContain('session_id');
+    });
+
+    test('should return correct metadata on successful reply setup', async () => {
+      console.log('\n--- TEST: reply metadata validation ---');
+
+      // Create a completed claude agent with a session_id
+      const agent = new AgentProcess(
+        'reply-meta-test',
+        'reply-task',
+        'claude',
+        'original prompt',
+        null,
+        'plan',
+        null,
+        AgentStatus.COMPLETED,
+        new Date('2026-01-01T00:00:00Z'),
+        new Date('2026-01-01T00:01:00Z'),
+        testDir,
+        null,
+        null,
+        'test-session-123',  // session_id
+        0,                   // conversationTurn
+        null,                // originalAgentId
+        []                   // replyAgentIds
+      );
+      manager['agents'].set('reply-meta-test', agent);
+
+      // Create agent dir and empty stdout
+      const agentDir = path.join(testDir, 'reply-meta-test');
+      await fs.mkdir(agentDir, { recursive: true });
+      await fs.writeFile(path.join(agentDir, 'stdout.log'), '');
+      await fs.writeFile(path.join(agentDir, 'meta.json'), JSON.stringify({
+        agent_id: 'reply-meta-test',
+        task_name: 'reply-task',
+        agent_type: 'claude',
+        prompt: 'original prompt',
+        status: 'completed',
+        started_at: '2026-01-01T00:00:00.000Z',
+        completed_at: '2026-01-01T00:01:00.000Z',
+        mode: 'plan',
+        session_id: 'test-session-123',
+        conversation_turn: 0,
+        original_agent_id: null,
+        reply_agent_ids: [],
+      }));
+
+      // This will fail if claude CLI is not installed, which is expected
+      try {
+        const result = await handleReply(manager, 'reply-meta-test', 'follow up message');
+        expect(result.original_agent_id).toBe('reply-meta-test');
+        expect(result.conversation_turn).toBe(1);
+        expect(result.agent_type).toBe('claude');
+        expect(result.task_name).toBe('reply-task');
+        expect(result.agent_id).toBeDefined();
+        expect(result.status).toBe('running');
+        console.log('Reply result:', JSON.stringify(result, null, 2));
+      } catch (err: any) {
+        // Expected when claude CLI not installed
+        if (err.message.includes('not found') || err.message.includes('not available') || err.message.includes('CLI tool')) {
+          console.log('Expected error (CLI not installed):', err.message);
+        } else {
+          throw err;
+        }
+      }
+    });
+
+    test('should include conversation metadata in status output', async () => {
+      console.log('\n--- TEST: conversation metadata in status ---');
+
+      // Create an agent with conversation metadata
+      const agent = new AgentProcess(
+        'conv-meta-test',
+        'conv-task',
+        'claude',
+        'reply message',
+        null,
+        'plan',
+        null,
+        AgentStatus.COMPLETED,
+        new Date(),
+        new Date(),
+        null,
+        null,
+        null,
+        'session-abc',  // session_id
+        2,              // conversationTurn
+        'original-123', // originalAgentId
+        ['reply-1']     // replyAgentIds
+      );
+      manager['agents'].set('conv-meta-test', agent);
+
+      const result = await handleStatus(manager, 'conv-task');
+
+      expect(result.agents.length).toBe(1);
+      const status = result.agents[0];
+      expect(status.conversation_turn).toBe(2);
+      expect(status.original_agent_id).toBe('original-123');
+      expect(status.reply_agent_ids).toEqual(['reply-1']);
+      expect(status.session_id).toBe('session-abc');
     });
   });
 });

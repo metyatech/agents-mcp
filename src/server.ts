@@ -7,7 +7,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { AgentManager, checkAllClis } from './agents.js';
 import { AgentType } from './parsers.js';
-import { handleSpawn, handleStatus, handleStop, handleTasks } from './api.js';
+import { handleSpawn, handleStatus, handleStop, handleTasks, handleReply } from './api.js';
 import { readConfig, type AgentConfig } from './persistence.js';
 import {
   buildVersionNotice,
@@ -25,6 +25,7 @@ const TOOL_NAMES = {
   status: 'Status',
   stop: 'Stop',
   tasks: 'Tasks',
+  reply: 'Reply',
 } as const;
 
 export function getParentSessionIdFromEnv(): string | null {
@@ -237,6 +238,34 @@ Returns tasks sorted by most recent activity, with full agent details including:
           required: [],
         },
       },
+      {
+        name: TOOL_NAMES.reply,
+        description: withVersionNotice(`Send a follow-up message to a completed agent, resuming its conversation with full context.
+
+Supported agents: claude, gemini, copilot. Codex, cursor, and opencode do not support reply.
+
+Usage flow:
+1. Spawn an agent and wait for it to complete
+2. Call Reply with the agent_id and your follow-up message
+3. A new agent is spawned that resumes the previous session
+4. Use Status to poll the new reply agent
+
+The reply agent inherits the original agent's task name, mode, and working directory. Each reply increments the conversation_turn counter. Status output includes conversation metadata (session_id, conversation_turn, original_agent_id, reply_agent_ids).`),
+        inputSchema: {
+          type: 'object',
+          properties: {
+            agent_id: {
+              type: 'string',
+              description: 'The agent ID to reply to (must be completed, not running)',
+            },
+            message: {
+              type: 'string',
+              description: 'The follow-up message to send to the agent',
+            },
+          },
+          required: ['agent_id', 'message'],
+        },
+      },
     ],
   };
 });
@@ -289,6 +318,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     } else if (normalizedName === 'tasks') {
       const limit = args?.limit as number | undefined;
       result = await handleTasks(manager, limit || 10);
+    } else if (normalizedName === 'reply') {
+      if (!args) {
+        throw new Error('Missing arguments for reply');
+      }
+      result = await handleReply(
+        manager,
+        args.agent_id as string,
+        args.message as string
+      );
     } else {
       result = { error: `Unknown tool: ${name}` };
     }

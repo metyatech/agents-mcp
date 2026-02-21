@@ -1121,3 +1121,273 @@ describe('Config-driven buildCommand', () => {
     expect(cmd.filter(a => a === '--approval-mode').length).toBe(1);
   });
 });
+
+describe('buildReplyCommand', () => {
+  let testDir: string;
+  let manager: AgentManager;
+
+  beforeEach(async () => {
+    testDir = path.join(tmpdir(), `reply_cmd_tests_${Date.now()}`);
+    await fs.mkdir(testDir, { recursive: true });
+    manager = new AgentManager(5, 10, testDir);
+    await manager['initialize']();
+  });
+
+  afterEach(async () => {
+    try {
+      await fs.rm(testDir, { recursive: true });
+    } catch {}
+  });
+
+  test('builds correct claude reply command in plan mode', () => {
+    const cmd = manager.buildReplyCommand(
+      'claude', 'follow up message', 'session-123', 'plan', 'claude-sonnet-4-6'
+    );
+
+    expect(cmd[0]).toBe('claude');
+    expect(cmd).toContain('-r');
+    expect(cmd).toContain('session-123');
+    expect(cmd).toContain('-p');
+    expect(cmd).toContain('follow up message');
+    expect(cmd).toContain('--output-format');
+    expect(cmd).toContain('stream-json');
+    expect(cmd).toContain('--verbose');
+    expect(cmd).toContain('--permission-mode');
+    expect(cmd).toContain('plan');
+    expect(cmd).toContain('--model');
+    expect(cmd).toContain('claude-sonnet-4-6');
+    expect(cmd).toContain('--settings');
+  });
+
+  test('builds correct claude reply command in edit mode', () => {
+    const cmd = manager.buildReplyCommand(
+      'claude', 'fix it', 'session-456', 'edit', 'claude-opus-4-6'
+    );
+
+    expect(cmd).toContain('--permission-mode');
+    const pmIdx = cmd.indexOf('--permission-mode');
+    expect(cmd[pmIdx + 1]).toBe('acceptEdits');
+  });
+
+  test('builds correct claude reply command with cwd', () => {
+    const cmd = manager.buildReplyCommand(
+      'claude', 'check files', 'session-789', 'plan', 'claude-sonnet-4-6', '/my/project'
+    );
+
+    expect(cmd).toContain('--add-dir');
+    expect(cmd).toContain('/my/project');
+  });
+
+  test('claude reply requires session_id', () => {
+    expect(() => {
+      manager.buildReplyCommand('claude', 'msg', null, 'plan', 'claude-sonnet-4-6');
+    }).toThrow('session_id');
+  });
+
+  test('builds correct gemini reply command', () => {
+    const cmd = manager.buildReplyCommand(
+      'gemini', 'continue work', null, 'plan', 'gemini-3-flash-preview'
+    );
+
+    expect(cmd[0]).toBe('gemini');
+    expect(cmd).toContain('--resume');
+    expect(cmd).toContain('latest');
+    expect(cmd).toContain('-p');
+    expect(cmd).toContain('continue work');
+    expect(cmd).toContain('--output-format');
+    expect(cmd).toContain('stream-json');
+    expect(cmd).toContain('--model');
+    expect(cmd).toContain('gemini-3-flash-preview');
+    expect(cmd).toContain('--approval-mode');
+    expect(cmd).toContain('plan');
+  });
+
+  test('builds correct gemini reply command in edit mode', () => {
+    const cmd = manager.buildReplyCommand(
+      'gemini', 'do it', null, 'edit', 'gemini-3-pro-preview'
+    );
+
+    expect(cmd).toContain('--yolo');
+    expect(cmd).not.toContain('--approval-mode');
+  });
+
+  test('builds correct copilot reply command', () => {
+    const cmd = manager.buildReplyCommand(
+      'copilot', 'what next', null, 'plan', 'claude-sonnet-4'
+    );
+
+    expect(cmd[0]).toBe('copilot');
+    expect(cmd).toContain('--continue');
+    expect(cmd).toContain('-p');
+    expect(cmd).toContain('what next');
+    expect(cmd).toContain('-s');
+    expect(cmd).toContain('--model');
+    expect(cmd).toContain('claude-sonnet-4');
+    // Plan mode should not have edit flags
+    expect(cmd).not.toContain('--allow-all-tools');
+  });
+
+  test('builds correct copilot reply command in edit mode', () => {
+    const cmd = manager.buildReplyCommand(
+      'copilot', 'apply fix', null, 'edit', 'gpt-5'
+    );
+
+    expect(cmd).toContain('--allow-all-tools');
+    expect(cmd).toContain('--allow-all-paths');
+    expect(cmd).toContain('--no-ask-user');
+  });
+
+  test('throws for unsupported agent type', () => {
+    expect(() => {
+      manager.buildReplyCommand('codex', 'msg', null, 'plan', 'gpt-5.3-codex');
+    }).toThrow('not supported');
+  });
+});
+
+describe('Session ID extraction and reply chain', () => {
+  test('extracts session_id from claude init event', async () => {
+    const baseDir = path.join(tmpdir(), `session_extract_${Date.now()}`);
+    const agentId = 'session-extract-test';
+    const agentDir = path.join(baseDir, agentId);
+    const logPath = path.join(agentDir, 'stdout.log');
+
+    await fs.mkdir(agentDir, { recursive: true });
+
+    const initEvent = JSON.stringify({
+      type: 'system',
+      subtype: 'init',
+      model: 'claude-sonnet-4-6',
+      session_id: 'extracted-session-id',
+    });
+    await fs.writeFile(logPath, initEvent + '\n');
+
+    const agent = new AgentProcess(
+      agentId, 'test-task', 'claude', 'test prompt',
+      null, 'plan', 999999, AgentStatus.RUNNING,
+      new Date(), null, baseDir
+    );
+
+    try {
+      await agent.readNewEvents();
+      expect(agent.sessionId).toBe('extracted-session-id');
+    } finally {
+      await fs.rm(baseDir, { recursive: true, force: true });
+    }
+  });
+
+  test('extracts session_id from gemini init event', async () => {
+    const baseDir = path.join(tmpdir(), `gemini_session_${Date.now()}`);
+    const agentId = 'gemini-session-test';
+    const agentDir = path.join(baseDir, agentId);
+    const logPath = path.join(agentDir, 'stdout.log');
+
+    await fs.mkdir(agentDir, { recursive: true });
+
+    const initEvent = JSON.stringify({
+      type: 'init',
+      model: 'gemini-3-flash-preview',
+      session_id: 'gemini-session-abc',
+    });
+    await fs.writeFile(logPath, initEvent + '\n');
+
+    const agent = new AgentProcess(
+      agentId, 'test-task', 'gemini', 'test prompt',
+      null, 'plan', 999999, AgentStatus.RUNNING,
+      new Date(), null, baseDir
+    );
+
+    try {
+      await agent.readNewEvents();
+      expect(agent.sessionId).toBe('gemini-session-abc');
+    } finally {
+      await fs.rm(baseDir, { recursive: true, force: true });
+    }
+  });
+
+  test('does not overwrite session_id once set', async () => {
+    const baseDir = path.join(tmpdir(), `session_no_overwrite_${Date.now()}`);
+    const agentId = 'no-overwrite-test';
+    const agentDir = path.join(baseDir, agentId);
+    const logPath = path.join(agentDir, 'stdout.log');
+
+    await fs.mkdir(agentDir, { recursive: true });
+
+    // Two init events with different session_ids
+    const events = [
+      JSON.stringify({ type: 'system', subtype: 'init', session_id: 'first-session' }),
+      JSON.stringify({ type: 'system', subtype: 'init', session_id: 'second-session' }),
+    ].join('\n') + '\n';
+    await fs.writeFile(logPath, events);
+
+    const agent = new AgentProcess(
+      agentId, 'test-task', 'claude', 'test prompt',
+      null, 'plan', 999999, AgentStatus.RUNNING,
+      new Date(), null, baseDir
+    );
+
+    try {
+      await agent.readNewEvents();
+      expect(agent.sessionId).toBe('first-session');
+    } finally {
+      await fs.rm(baseDir, { recursive: true, force: true });
+    }
+  });
+
+  test('reply chain tracking: originalAgentId and replyAgentIds persisted', async () => {
+    const baseDir = path.join(tmpdir(), `reply_chain_${Date.now()}`);
+
+    const agent = new AgentProcess(
+      'chain-original', 'chain-task', 'claude', 'original prompt',
+      null, 'plan', null, AgentStatus.COMPLETED,
+      new Date(), new Date(), baseDir,
+      null, null, 'session-xyz', 0, null, []
+    );
+
+    try {
+      await agent.saveMeta();
+
+      // Simulate adding a reply
+      agent.replyAgentIds.push('reply-1');
+      await agent.saveMeta();
+
+      const loaded = await AgentProcess.loadFromDisk('chain-original', baseDir);
+      expect(loaded).not.toBeNull();
+      expect(loaded!.sessionId).toBe('session-xyz');
+      expect(loaded!.conversationTurn).toBe(0);
+      expect(loaded!.originalAgentId).toBeNull();
+      expect(loaded!.replyAgentIds).toEqual(['reply-1']);
+
+      // Create reply agent
+      const reply = new AgentProcess(
+        'reply-1', 'chain-task', 'claude', 'follow up',
+        null, 'plan', null, AgentStatus.COMPLETED,
+        new Date(), new Date(), baseDir,
+        null, null, 'session-xyz', 1, 'chain-original', []
+      );
+
+      await reply.saveMeta();
+      const loadedReply = await AgentProcess.loadFromDisk('reply-1', baseDir);
+      expect(loadedReply).not.toBeNull();
+      expect(loadedReply!.conversationTurn).toBe(1);
+      expect(loadedReply!.originalAgentId).toBe('chain-original');
+      expect(loadedReply!.sessionId).toBe('session-xyz');
+    } finally {
+      await fs.rm(baseDir, { recursive: true, force: true });
+    }
+  });
+
+  test('toDict includes conversation metadata', () => {
+    const agent = new AgentProcess(
+      'dict-conv', 'dict-task', 'claude', 'prompt',
+      null, 'plan', null, AgentStatus.COMPLETED,
+      new Date(), new Date(), null,
+      null, null, 'session-abc', 3, 'original-xyz', ['r1', 'r2']
+    );
+
+    const dict = agent.toDict();
+    expect(dict.session_id).toBe('session-abc');
+    expect(dict.conversation_turn).toBe(3);
+    expect(dict.original_agent_id).toBe('original-xyz');
+    expect(dict.reply_agent_ids).toEqual(['r1', 'r2']);
+  });
+});

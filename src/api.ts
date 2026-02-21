@@ -34,6 +34,16 @@ export interface SpawnResult {
   started_at: string;
 }
 
+export interface ReplyResult {
+  agent_id: string;
+  original_agent_id: string;
+  agent_type: string;
+  task_name: string;
+  conversation_turn: number;
+  status: string;
+  started_at: string;
+}
+
 export interface AgentStatusDetail {
   agent_id: string;
   agent_type: string;
@@ -54,6 +64,10 @@ export interface AgentStatusDetail {
     tail_errors: string[];
   };
   cursor: string;  // ISO timestamp - send back in next request for delta
+  conversation_turn?: number;
+  original_agent_id?: string | null;
+  reply_agent_ids?: string[];
+  session_id?: string | null;
 }
 
 export interface TaskStatusResult {
@@ -322,6 +336,10 @@ export async function handleStatus(
       errors,
       diagnostics: diagPayload,
       cursor: agentTimestamp,  // Return latest timestamp for this agent
+      conversation_turn: agent.conversationTurn,
+      original_agent_id: agent.originalAgentId,
+      reply_agent_ids: agent.replyAgentIds,
+      session_id: agent.sessionId,
     });
   }
 
@@ -465,4 +483,31 @@ export async function handleStop(
       not_found: [],
     };
   }
+}
+
+export async function handleReply(
+  manager: AgentManager,
+  agentId: string,
+  message: string
+): Promise<ReplyResult> {
+  console.error(`[reply] Sending reply to agent ${agentId}...`);
+
+  const agent = await manager.get(agentId);
+  if (!agent) {
+    throw new Error(`Agent '${agentId}' not found`);
+  }
+
+  const replyAgent = await manager.reply(agent, message);
+
+  console.error(`[reply] Spawned reply agent ${replyAgent.agentId} (turn ${replyAgent.conversationTurn}) for original ${agentId}`);
+
+  return {
+    agent_id: replyAgent.agentId,
+    original_agent_id: replyAgent.originalAgentId || agentId,
+    agent_type: replyAgent.agentType,
+    task_name: replyAgent.taskName,
+    conversation_turn: replyAgent.conversationTurn,
+    status: replyAgent.status,
+    started_at: replyAgent.startedAt.toISOString(),
+  };
 }
