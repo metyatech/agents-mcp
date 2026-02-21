@@ -1,483 +1,544 @@
-# `@swarmify/agents-mcp`
+<!-- markdownlint-disable MD025 -->
+# Tool Rules (compose-agentsmd)
+- Before starting any work, run `compose-agentsmd` from the project root.
+- `compose-agentsmd` intentionally regenerates `AGENTS.md`; any resulting `AGENTS.md` diff is expected and must not be treated as an unexpected external change.
+- If `compose-agentsmd` is not available, install it via npm: `npm install -g compose-agentsmd`.
+- To update shared/global rules, use `compose-agentsmd edit-rules` to locate the writable rules workspace, make changes only in that workspace, then run `compose-agentsmd apply-rules` (do not manually clone or edit the rules source repo outside this workflow).
+- If you find an existing clone of the rules source repo elsewhere, do not assume it is the correct rules workspace; always treat `compose-agentsmd edit-rules` output as the source of truth.
+- `compose-agentsmd apply-rules` pushes the rules workspace when `source` is GitHub (if the workspace is clean), then regenerates `AGENTS.md` with refreshed rules.
+- Do not edit `AGENTS.md` directly; update the source rules and regenerate.
+- `tools/tool-rules.md` is the shared rule source for all repositories that use compose-agentsmd.
+- Before applying any rule updates, present the planned changes first with an ANSI-colored diff-style preview, ask for explicit approval, then make the edits.
+- These tool rules live in tools/tool-rules.md in the compose-agentsmd repository; do not duplicate them in other rule modules.
+
+Source: github:metyatech/agent-rules@HEAD/rules/global/agent-rules-composition.md
+
+# Rule composition and maintenance
+
+## Scope and composition
+
+- AGENTS.md is self-contained; do not rely on parent/child AGENTS for inheritance or precedence.
+- Maintain shared rules centrally and compose per project; use project-local rules only for truly local policies.
+- Place AGENTS.md at the project root; only add another AGENTS.md for nested independent projects.
+
+## Update policy
+
+- Never edit AGENTS.md directly; update source rules and regenerate AGENTS.md.
+- A request to "update rules" means: update the appropriate rule module and ruleset, then regenerate AGENTS.md.
+- If the user gives a persistent instruction (e.g., "always", "must"), encode it in the appropriate module (global vs local).
+- When acknowledging a new persistent instruction, update the rule module in the same change set and regenerate AGENTS.md.
+- When creating a new repository, set up rule files (e.g., agent-ruleset.json and any local rules) so compose-agentsmd can run.
+- When updating rules, infer the core intent; if it is a global policy, record it in global rules rather than project-local rules.
+- If a task requires domain rules not listed in agent-ruleset.json, update the ruleset to include them and regenerate AGENTS.md before proceeding.
+- When rule changes produce a diff, include it in the final response unless the user explicitly asks to omit it.
+
+## Editing standards
+
+- Keep rules MECE, concise, and non-redundant.
+- Use short, action-oriented bullets; avoid numbered lists unless order matters.
+- Prefer the most general applicable rule to avoid duplication.
+- Do not use numeric filename prefixes (e.g., `00-...`) to impose ordering; treat rule modules as a flat set. If ordering matters, encode it explicitly in composition/tooling rather than filenames.
+
+## Rule placement (global vs domain)
+
+- Decide rule placement based on **where the rule is needed**, not what topic it covers.
+- If the rule could be needed from any workspace or repository, make it global.
+- Only use domain rules when the rule is strictly relevant inside repositories that opt in to that domain.
+- Before choosing domain, verify: "Will this rule ever be needed when working from a workspace that does not include this domain?" If yes, make it global.
+
+Source: github:metyatech/agent-rules@HEAD/rules/global/autonomous-operations.md
+
+# Autonomous operations
+
+- Optimize for minimal human effort; default to automation over manual steps.
+- Drive work from the desired outcome: choose the highest-quality safe path that satisfies the requested quality/ideal bar, and execute end-to-end.
+- Treat speed as a secondary optimization; never trade down correctness, safety, robustness, or verifiability unless the requester explicitly approves that tradeoff.
+- Assume end-to-end autonomy for repository operations (issue triage, PRs, direct pushes to main/master, merges, releases, repo admin) only within repositories under the user's control (e.g., owned by metyatech or where the user has explicit maintainer/push authority), unless the user restricts scope; for third-party repos, require explicit user request before any of these operations.
+- Do not preserve backward compatibility unless explicitly requested; avoid legacy aliases and compatibility shims by default.
+- When work reveals rule gaps, redundancy, or misplacement, proactively update rule modules/rulesets (including moves/renames) and regenerate AGENTS.md without waiting for explicit user requests.
+- After each task, briefly assess whether avoidable mistakes occurred. In direct mode, propose rule updates if warranted. In delegated mode, include improvement suggestions in the task result.
+- If you state a persistent workflow change (e.g., `from now on`, `I'll always`), immediately propose the corresponding rule update and request approval in the same task; do not leave it as an unrecorded promise. When operating under a multi-agent-delegation model, follow that rule module's guidance on restricted operations before proposing changes.
+- Because session memory resets between tasks, treat rule files as persistent memory; when any issue or avoidable mistake occurs, update rules in the same task to prevent recurrence.
+- Treat these rules as the source of truth; do not override them with repository conventions. If a repo conflicts, update the repo to comply or update the rules to encode the exception; do not make undocumented exceptions.
+- When something is unclear, investigate to resolve it; do not proceed with unresolved material uncertainty. If still unclear, ask and include what you checked.
+- Do not proceed based on assumptions or guesses without explicit user approval; hypotheses may be discussed but must not drive action.
+- Make decisions explicit when they affect scope, risk, cost, or irreversibility.
+- Prefer asynchronous, low-friction control channels (GitHub Issues/PR comments) unless a repository mandates another.
+- Design autonomous workflows for high volume: queue requests, set concurrency limits, and auto-throttle to prevent overload.
+
+Source: github:metyatech/agent-rules@HEAD/rules/global/cli-standards.md
+
+# CLI standards
+
+- Provide --help/-h with clear usage, options, and examples; include required parameters in examples.
+- Provide --version (use -V); reserve -v for --verbose.
+- Support stdin/stdout piping; allow output redirection (e.g., --output for file creation).
+- Offer machine-readable output (e.g., --json) when emitting structured data.
+- For modifying/deleting actions, provide --dry-run and an explicit bypass (--yes/--force).
+- Provide controllable logging (--quiet, --verbose, or --trace).
+- Use deterministic exit codes (0 success, non-zero failure) and avoid silent fallbacks.
+- For JSON configuration, define/update a JSON Schema and validate config on load.
+- For interactive CLI prompts, provide required context before asking; for yes/no prompts, Enter means "Yes" and "n" means "No".
+
+Source: github:metyatech/agent-rules@HEAD/rules/global/command-execution.md
+
+# Workflow and command execution
+
+- Do not add wrappers or pipes to commands unless the user explicitly asks.
+- Prefer repository-standard scripts/commands (package.json scripts, README instructions).
+- Reproduce reported command issues by running the same command (or closest equivalent) before proposing fixes.
+- Avoid interactive git prompts by using --no-edit or setting GIT_EDITOR=true.
+- If elevated privileges are required, use sudo where available; otherwise run as Administrator.
+- Keep changes scoped to affected repositories; when shared modules change, update consumers and verify at least one.
+- If no branch is specified, work on the current branch; direct commits to main/master are allowed.
+- After addressing PR review feedback, resolve the corresponding review thread(s) before concluding; if you lack permission, state it explicitly.
+- Before re-requesting review after addressing feedback, run the relevant verification suite and summarize results (commands + outcomes) in the PR comment/description.
+- After pushing fixes for PR review feedback, re-request review only from reviewer(s) who posted the addressed feedback in the current round.
+- Do not re-request review from reviewers (including AI reviewers) who did not post addressed feedback, or who already indicated no actionable issues.
+- If no applicable reviewer remains, ask who should review next.
+- When Codex and/or Copilot review bots are configured for the repo, trigger re-review only for the bot(s) that posted addressed feedback.
+- For Codex re-review (only when applicable): comment `@codex review` on the PR.
+- For Copilot re-review (only when applicable): use `gh api` to remove+re-request the bot reviewer `copilot-pull-request-reviewer[bot]` (do not rely on `gh pr edit --add-reviewer Copilot`).
+  - Remove: `gh api --method DELETE /repos/{owner}/{repo}/pulls/{pr}/requested_reviewers -f "reviewers[]=copilot-pull-request-reviewer[bot]"`
+  - Add: `gh api --method POST /repos/{owner}/{repo}/pulls/{pr}/requested_reviewers -f "reviewers[]=copilot-pull-request-reviewer[bot]"`
+- After completing a PR, merge it, sync the target branch, and delete the PR branch locally and remotely.
+- Agent platforms have different execution capabilities (sandboxing, network access, push permissions). Do not assume capabilities beyond what the current platform provides; fail explicitly when a required capability is unavailable.
+- When handling GitHub notifications, use `DELETE /notifications/threads/{id}` (HTTP 204) to mark them as **done** (removes from inbox/moves to Done tab). Do NOT use `PATCH /notifications/threads/{id}` (marks as read but leaves in inbox). After processing notifications, bulk-delete any remaining read-but-not-done notifications with the same DELETE API.
+
+Source: github:metyatech/agent-rules@HEAD/rules/global/delivery-hard-gates.md
+
+# Delivery hard gates
+
+These are non-negotiable completion gates for any state-changing work and for any response that claims "done", "fixed", "working", or "passing".
+
+## Acceptance criteria (AC)
+
+- Before state-changing work, list Acceptance Criteria (AC) as binary, testable statements.
+- For read-only tasks, AC may be deliverables/questions answered; keep them checkable.
+- If AC are ambiguous or not testable, ask blocking questions before proceeding.
+- Keep AC compact by default (aim: 1-3 items). Expand only when risk/complexity demands it or when the requester asks.
+
+## Evidence and verification
+
+- For each AC, define verification evidence (automated test preferred; otherwise a deterministic manual procedure).
+- Maintain an explicit mapping: `AC -> evidence (tests/commands/manual steps)`.
+- The mapping may be presented in a compact per-item form (one line per AC including evidence + outcome) to reduce verbosity.
+- For code or runtime-behavior changes, automated tests are required unless the requester explicitly approves skipping.
+- Bugfixes MUST include a regression test that fails before the fix and passes after.
+- Run the repo's full verification suite (lint/format/typecheck/test/build) using a single repo-standard `verify` command when available; if missing, add it.
+- Enforce verification locally via commit-time hooks (pre-commit or repo-native) and in CI; skipping requires explicit requester approval.
+- For non-code changes, run the relevant subset and justify.
+- If required checks cannot be run, stop and ask for explicit approval to proceed with partial verification, and provide an exact manual verification plan.
+
+## Final response (MUST include)
+
+- A compact goal+verification report. Labels may be `Goal`/`Verification` instead of `AC` as long as it is equivalent.
+- `AC -> evidence` mapping with outcomes (PASS/FAIL/NOT RUN/N/A), possibly in compact per-item form.
+- The exact verification commands executed and their outcomes.
+
+Source: github:metyatech/agent-rules@HEAD/rules/global/implementation-and-coding-standards.md
+
+# Engineering and implementation standards
+
+- Prefer official/standard approaches recommended by the framework or tooling.
+- Prefer well-maintained external dependencies; build in-house only when no suitable option exists.
+- Prefer third-party tools/services over custom implementations when they can meet the requirements; prefer free options (OSS/free-tier) when feasible and call out limitations/tradeoffs.
+- PowerShell: `\` is a literal character (not an escape). Do not cargo-cult `\\` escaping patterns from other languages; validate APIs that require names like `Local\...` (e.g., named mutexes).
+- PowerShell: avoid assigning to or shadowing automatic/read-only variables (e.g., `$args`, `$PID`); use different names for locals.
+- PowerShell: when invoking PowerShell from PowerShell, avoid double-quoted `-Command` strings that allow the outer shell to expand `$...`; prefer `-File`, single quotes, or here-strings to control expansion.
+- If functionality appears reusable, assess reuse first and propose a shared module/repo; prefer remote dependencies (never local filesystem paths).
+- Maintainability > testability > extensibility > readability.
+- Single responsibility; keep modules narrowly scoped and prefer composition over inheritance.
+- Keep dependency direction clean and swappable; avoid global mutable state.
+- Avoid deep nesting; use guard clauses and small functions.
+- Use clear, intention-revealing naming; avoid "Utils" dumping grounds.
+- Prefer configuration/constants over hardcoding; consolidate change points.
+- For GUI changes, prioritize ergonomics and discoverability so first-time users can complete core flows without external documents.
+- Every user-facing GUI component (inputs, actions, status indicators, lists, and dialog controls) must include an in-app explanation (for example tooltip, context help panel, or equivalent).
+- Do not rely on README-only guidance for GUI operation; critical usage guidance must be available inside the GUI itself.
+- For GUI styling, prefer frameworks and component libraries that provide a modern, polished appearance out of the box (e.g., Material Design, shadcn/ui, Fluent); avoid hand-crafting extensive custom styles when an established design system can achieve the same result with less effort.
+- When selecting a UI framework, prioritize built-in component quality and default aesthetics over raw flexibility; the goal is a standard, modern-looking UI with minimal custom styling code.
+- Keep everything DRY across code, specs, docs, tests, configs, and scripts; proactively refactor repeated procedures into shared configs/scripts with small, local overrides.
+- Persist durable runtime/domain data in a database with a fully normalized schema (3NF/BCNF target): store each fact once with keys/constraints, and compute derived statuses/views at read time instead of duplicating them.
+- Fix root causes; remove obsolete/unused code, branches, comments, and helpers.
+- Avoid leaving half-created state on failure paths. Any code that allocates/registers/starts resources must have a shared teardown that runs on all failure and cancellation paths.
+- Do not block inside async APIs or async-looking code paths; avoid synchronous I/O and synchronous process execution where responsiveness is expected.
+- Avoid external command execution (PATH-dependent tools, stringly-typed argument concatenation). Prefer native libraries/SDKs. If unavoidable: use absolute paths, safe argument handling, and strict input validation.
+- Prefer stable public APIs over internal/private APIs. If internal/private APIs are unavoidable, isolate them and document the reason and the expected break risk.
+- Externalize large embedded strings/templates/rules when possible.
+- Do not commit build artifacts (follow the repo's .gitignore).
+- Align file/folder names with their contents and keep naming conventions consistent.
+- Do not assume machine-specific environments (fixed workspace directories, drive letters, per-PC paths). Prefer repo-relative paths and explicit configuration so workflows work in arbitrary clone locations.
+- Temporary files/directories created by the agent MUST be placed only under the OS temp directory (e.g., `%TEMP%` / `$env:TEMP`). Do not create ad-hoc temp folders in repos/workspaces unless the requester explicitly approves.
 
-MCP server enabling SubAgents and Swarms for any MCP client. Any client (Claude, Codex, Gemini) can spawn any agent CLI.
+Source: github:metyatech/agent-rules@HEAD/rules/global/linting-formatting-and-static-analysis.md
 
-## Cross-Platform Architecture
+# Linters, formatters, and static analysis
 
-```
-                         MCP Protocol
-                              |
-        +---------------------+---------------------+
-        |                     |                     |
-   Claude Code             Codex                Gemini CLI
-   (MCP Client)         (MCP Client)          (MCP Client)
-        |                     |                     |
-        +---------------------+---------------------+
-                              |
-                    +-------------------+
-                    |   agents-mcp      |
-                    | (MCP Server)      |
-                    +-------------------+
-                              |
-        +---------------------+---------------------+
-        |                     |                     |
-   claude CLI            codex CLI            gemini CLI
-   (SubAgent)            (SubAgent)           (SubAgent)
-```
+## General policy
 
-**Any client can spawn any agent.** Claude can spawn Codex. Gemini can spawn Claude. The MCP protocol is the universal interface.
+- Every code repo must have a formatter and a linter/static analyzer for its primary languages.
+- Prefer one formatter and one linter per language; avoid overlapping tools that fight each other.
+- Follow the standard toolchains below. If a repo conflicts, migrate it to comply unless the user explicitly restricts scope.
+- If you believe an exception is needed, encode it as a rule update and regenerate AGENTS.md before proceeding.
+- Enforce in CI: run formatting checks (verify-no-changes) and linting on pull requests and require them for merges.
+- Treat warnings as errors in CI; when a tool cannot, use its strictest available setting so warnings fail CI.
+- Do not disable rules globally; keep suppressions narrow, justified, and time-bounded.
+- Pin tool versions (lockfiles/manifests) for reproducible CI.
 
-## Package Overview
+## Design and visual accessibility automation
 
-This server provides four MCP tools for agent lifecycle management:
-- `Spawn` - Start an agent (returns immediately for non-blocking pattern)
-- `Status` - Get progress with delta-based cursor polling
-- `Stop` - Stop one agent or all in a task
-- `Tasks` - List all tasks sorted by recent activity
+- Apply this section to projects with web UI components only.
+- For any design/UI styling change in any project, enforce automated visual accessibility checks as part of the repo-standard `verify` command and CI.
+- Do not rely on per-page/manual test maintenance; use route discovery (for example sitemap, generated route lists, or framework route manifests) so newly added pages are automatically included.
+- Validate both light and dark themes when theme switching is supported.
+- Validate at least default, hover, and focus states for interactive elements.
+- Enforce non-text boundary contrast checks across all visible UI elements that present boundaries (including interactive controls and container-like elements), not only predefined component classes.
+- Do not hardcode a narrow selector allowlist for boundary checks; use broad DOM discovery with only minimal technical exclusions (for example hidden/zero-size/non-rendered nodes).
+- Fail CI on violations; do not silently ignore design regressions.
+- If temporary exclusions are unavoidable, keep them narrowly scoped, documented with rationale, and remove them promptly.
 
-Pure infrastructure - no decision-making. The orchestrator handles scheduling, task assignment, and conflict resolution.
+## Security baseline
 
-## Multi-Agent Patterns
+- Require dependency vulnerability scanning appropriate to the ecosystem (SCA) for merges. If you cannot enable it, report the limitation and get explicit user approval before proceeding without it.
+- Enable GitHub secret scanning and remediate findings; never commit secrets. If it is unavailable, add a repo-local secret scanner and require it for merges.
+- Enable CodeQL code scanning for supported languages. If it cannot be enabled, report the limitation and use the best available alternative for that ecosystem.
 
-This server enables two patterns:
+## Default toolchain by language
 
-**SubAgents** - Hierarchical delegation. Orchestrator spawns specialized agents for specific tasks. Each agent works in isolation and reports back.
+### JavaScript / TypeScript (incl. React/Next)
 
-**Swarms** - Parallel execution. Multiple agents work simultaneously on different parts of a problem. Orchestrator assigns non-overlapping files and synthesizes results.
+- Format+lint: ESLint + Prettier.
+- When configuring Prettier, always add and maintain `.prettierignore` so generated/build outputs and composed files are not formatted/linted as source (e.g., `dist/`, build artifacts, and `AGENTS.md` when generated by compose-agentsmd).
+- Typecheck: `tsc` with strict settings for TS projects.
+- Dependency scan: `osv-scanner`. If unsupported, use the package manager's audit tooling.
 
-Both patterns use the same tools. The orchestrator decides the pattern based on the task.
+### Python
 
-## Repository Structure
+- Format+lint: Ruff.
+- Typecheck: Pyright.
+- Dependency scan: pip-audit.
 
-```
-/src
-  index.ts          # MCP server entry point
-  server.ts         # MCP tool registration and handler routing
-  api.ts            # Tool handlers (spawn, status, stop, tasks)
-  agents.ts         # AgentManager class - core lifecycle management
-  parsers.ts        # Normalize 5 agent formats into unified events
-  persistence.ts    # Config/disk storage at ~/.agents/
-  summarizer.ts     # Compress events, delta polling
-  ralph.ts         # Ralph mode config and prompt building
-  version.ts        # Version checking with npm registry
-  file_ops.ts       # Extract file ops from bash commands
-/tests              # 17 test files (no mocks, real services only)
-/testdata            # Fixtures for parser tests
-```
+### Go
 
-## Core Architecture
+- Format: gofmt.
+- Lint/static analysis: golangci-lint (includes staticcheck).
+- Dependency scan: govulncheck.
 
-### AgentManager Class
+### Rust
 
-Located in `agents.ts` (line 618+), manages agent lifecycle:
+- Format: cargo fmt.
+- Lint/static analysis: cargo clippy with warnings as errors.
+- Dependency scan: cargo audit.
 
-- **State tracking**: running, completed, failed, stopped
-- **Limits enforcement**: maxAgents (50), maxConcurrent (10)
-- **Auto-cleanup**: removes agents older than 7 days
-- **Process groups**: SIGTERM/SIGKILL propagate to all child processes
-- **Persistence**: loads existing agents from disk on startup
-- **Filtering**: optional `filterByCwd` to only see agents in specific directory
+### Java
 
-### Event Normalization (parsers.ts)
+- Format: Spotless + google-java-format.
+- Lint/static analysis: Checkstyle + SpotBugs.
+- Dependency scan: OWASP Dependency-Check.
 
-Each agent CLI logs differently. Parsers normalize to unified event format:
+### Kotlin
 
-**Agent parsers:**
-- `normalizeCodex()` - parses Codex JSONL format
-- `normalizeClaude()` - parses Claude stream-json format
-- `normalizeGemini()` - parses Gemini stream-json format
-- `normalizeCursor()` - parses Cursor stream-json format
-- `normalizeOpencode()` - parses OpenCode JSON format
+- Format: Spotless + ktlint.
+- Lint/static analysis: detekt.
+- Compiler: enable warnings-as-errors in CI; if impractical, get explicit user approval before relaxing.
 
-**Critical gotcha:** Codex `payload.arguments` is a JSON string, not an object. Must `JSON.parse()` before accessing.
+### C#
 
-**Unified event types:** `init`, `message`, `bash`, `file_read`, `file_write`, `file_delete`, `thinking`, `tool_use`, `turn_start`, `result`
+- Format: dotnet format (verify-no-changes in CI).
+- Lint/static analysis: enable .NET analyzers; treat warnings as errors; enable nullable reference types.
+- Dependency scan: `dotnet list package --vulnerable`.
 
-### Delta Polling (summarizer.ts)
+### C++
 
-Optimizes Status tool to minimize token usage:
+- Format: clang-format.
+- Lint/static analysis: clang-tidy.
+- Build: enable strong warnings and treat as errors; run sanitizers (ASan/UBSan) in CI where supported.
 
-- **Cursor-based**: `since` timestamp returns only new events since last call
-- **Collapses sequential events**: thinking deltas, message deltas
-- **Deduplicates file ops**: sets of created/modified/read/deleted paths
-- **Truncates bash commands**: 120 chars max (heredocs become `cat <<EOF > path`)
-- **Error extraction**: scans last 20 raw events for error keywords
+### PowerShell
 
-## MCP Tools
+- Format+lint: PSScriptAnalyzer (Invoke-Formatter + Invoke-ScriptAnalyzer).
+- Runtime: Set-StrictMode -Version Latest; fail fast on errors.
+- Tests: Pester when tests exist.
+- Enforce PSScriptAnalyzer via the repo's standard `verify` command/script when PowerShell is used; treat findings as errors.
 
-### Spawn Tool
+### Shell (sh/bash)
 
-**Handler:** `handleSpawn()` in `api.ts`
+- Format: shfmt.
+- Lint: shellcheck.
 
-**Parameters:**
-| Parameter | Required | Description |
-|-----------|-----------|-------------|
-| `task_name` | Yes | Groups related agents (e.g., "auth-feature") |
-| `agent_type` | Yes | `claude`, `codex`, `gemini`, `cursor`, `opencode` |
-| `prompt` | Yes | Task for the agent |
-| `mode` | No | `plan` (read-only, default), `edit` (write), `ralph` (autonomous) |
-| `cwd` | No | Working directory for agent |
-| `effort` | No | `fast`, `default`, `detailed` - maps to agent models |
+### Dockerfile
 
-**Returns immediately** with `agent_id`. Don't call Status right away - wait 2+ minutes for agent to do work.
+- Lint: hadolint.
 
-### Status Tool
+### Terraform
 
-**Handler:** `handleStatus()` in `api.ts`
+- Format: terraform fmt -check.
+- Validate: terraform validate.
+- Lint: tflint.
+- Security scan: trivy config.
 
-**Parameters:**
-| Parameter | Required | Description |
-|-----------|-----------|-------------|
-| `task_name` | Yes | Task to check |
-| `filter` | No | `running` (default), `completed`, `failed`, `stopped`, `all` |
+### YAML
 
-**Returns:**
-- Agent status (running, completed, failed, stopped)
-- Files created/modified/read/deleted (deduplicated sets)
-- Bash commands executed (truncated to 120 chars)
-- Last 5 messages (not full history)
-- Cursor timestamp (send back in next call for delta)
+- Lint: yamllint.
 
-### Stop Tool
+### Markdown
 
-**Handler:** `handleStop()` in `api.ts`
+- Lint: markdownlint.
 
-**Parameters:**
-| Parameter | Required | Description |
-|-----------|-----------|-------------|
-| `task_name` | Yes | Task to stop |
-| `agent_id` | No | Optional specific agent ID (if omitted, stops all in task) |
+Source: github:metyatech/agent-rules@HEAD/rules/global/multi-agent-delegation.md
 
-Sends SIGTERM to process group. If process doesn't exit in 10s, sends SIGKILL.
+﻿# Multi-agent delegation
 
-### Tasks Tool
+## Execution context
 
-**Handler:** `handleTasks()` in `api.ts`
+- Every agent operates in either **direct mode** (responding to a human user) or **delegated mode** (executing a task from a delegating agent).
+- In direct mode, the "requester" is the human user. In delegated mode, the "requester" is the delegating agent.
+- Default to direct mode. Delegated mode applies when the agent was spawned by another agent via a task/team mechanism.
 
-**Parameters:**
-| Parameter | Required | Description |
-|-----------|-----------|-------------|
-| `limit` | No | Max tasks to return (default: 10) |
+## Delegated mode overrides
 
-Lists all tasks sorted by most recent activity (latest completion time or current time if running).
+When operating in delegated mode:
 
-## Agent Modes
+- The delegation constitutes plan approval; do not re-request approval from the human user.
+- Respond in English, not the user-facing language.
+- Do not emit notification sounds.
+- Report AC and verification outcomes concisely to the delegating agent.
+- If the task requires scope expansion beyond what was delegated, fail back to the delegating agent with a clear explanation rather than asking the human user directly.
 
-### Plan Mode (default, read-only)
+## Restricted operations
 
-For research, exploration, code review. Agent cannot write files.
+The following operations require explicit delegation from the delegating agent or user. Do not perform them based on self-judgment alone:
 
-| Agent | Plan Mode Flags |
-|-------|----------------|
-| Claude | `--permission-mode plan` |
-| Codex | sandboxed (no `--full-auto`) |
-| Gemini | no auto-approve flags |
-| Cursor | no auto-approve flags |
-| OpenCode | no write permissions |
-
-### Edit Mode (read + write)
-
-For implementation, refactoring, fixes. Agent can write files.
-
-| Agent | Edit Mode Flags |
-|-------|----------------|
-| Claude | `acceptEdits` (prompt suffix) |
-| Codex | `--full-auto` |
-| Gemini | `--yolo` |
-| Cursor | `-f` |
-| OpenCode | write permissions |
-
-### Ralph Mode (autonomous)
-
-Spawns ONE agent with full permissions and instructions to work through all tasks in a `RALPH.md` file.
-
-**RALPH.md format:**
-```markdown
-## [ ] Implement user authentication
-
-Add JWT-based auth to backend.
-
-### Updates
-
----
-
-## [x] Add rate limiting
-
-Protect endpoints from abuse.
-
-### Updates
-- Added middleware with sliding window counter
-- Completed: All endpoints protected
-```
-
-**How it works:**
-1. Create `RALPH.md` in your project directory with tasks
-2. Call `Spawn(mode='ralph', cwd='./my-project', prompt='Build auth')`
-3. Agent reads RALPH.md, understands system, picks tasks logically
-4. For each task: completes work, marks `## [ ]` to `## [x]`, adds update
-5. Continues until all tasks checked or stopped
-
-**Safety:**
-- Scoped by `cwd` - orchestrator controls blast radius
-- Warns if used in dangerous paths (home dir, `/`, `/System`, `/usr`, etc.)
-- RALPH.md must exist before spawn
-
-## Agent Discovery & Configuration
-
-### Auto-Discovery at Startup
-
-Checks which agent CLIs are installed using `checkCliAvailable()` in `agents.ts`:
-- Executes `which <cli>` command
-- Returns `[available: boolean, pathOrError: string | null]`
-- Enabled agents appear in Spawn tool description
-
-### Config Location
-
-**Primary:** `~/.agents/swarm/config.json`
-**Legacy fallback:** `~/.agents/config.json`, `~/.swarmify/agents/config.json`
-**Temp fallback:** `/tmp/agents/` (if others not writable)
-
-### Agent Config Structure
-
-```json
-{
-  "agents": {
-    "claude": {
-      "command": "claude -p '{prompt}' --output-format stream-json",
-      "enabled": true,
-      "models": {
-        "fast": "claude-haiku-4-5-20251001",
-        "default": "claude-sonnet-4-5",
-        "detailed": "claude-opus-4-5"
-      },
-      "provider": "anthropic"
-    },
-    "codex": {
-      "command": "codex exec --sandbox workspace-write '{prompt}' --json",
-      "enabled": true,
-      "models": {
-        "fast": "gpt-4o-mini",
-        "default": "gpt-5.3-codex",
-        "detailed": "gpt-5.1-codex-max"
-      },
-      "provider": "openai"
-    },
-    "gemini": {
-      "command": "gemini '{prompt}' --output-format stream-json",
-      "enabled": true,
-      "models": {
-        "fast": "gemini-3-flash-preview",
-        "default": "gemini-3-flash-preview",
-        "detailed": "gemini-3-pro-preview"
-      },
-      "provider": "google"
-    },
-    "cursor": {
-      "command": "cursor-agent -p --output-format stream-json '{prompt}'",
-      "enabled": false,
-      "models": {
-        "fast": "composer-1",
-        "default": "composer-1",
-        "detailed": "composer-1"
-      },
-      "provider": "custom"
-    },
-    "opencode": {
-      "command": "opencode run --format json '{prompt}'",
-      "enabled": false,
-      "models": {
-        "fast": "zai-coding-plan/glm-4.7-flash",
-        "default": "zai-coding-plan/glm-4.7",
-        "detailed": "zai-coding-plan/glm-4.7"
-      },
-      "provider": "custom"
-    }
-  }
-}
-```
-
-## Storage & Persistence
-
-### Directory Structure
-
-```
-~/.agents/swarm/
-  config.json          # Agent configuration
-  cache.json           # Version cache (12h TTL)
-  agents/
-    {agent-id}/
-      metadata.json     # task_name, type, mode, status, timestamps
-      stdout.log       # Raw agent output (streamed line by line)
-```
-
-### AgentProcess.loadFromDisk()
-
-Located in `agents.ts`, called during AgentManager initialization:
-
-1. Reads all directories in `~/.agents/swarm/agents/`
-2. Loads `metadata.json` for each
-3. Filters by age (cleans up older than cleanupAgeDays, default 7)
-4. Filters by `cwd` if `filterByCwd` is set
-5. Checks if process is still running via `updateStatusFromProcess()`
-6. Adds to internal `agents` Map
-
-### Metadata Schema
-
-```typescript
-{
-  agent_id: string,        // UUID
-  task_name: string,       // Task grouping
-  agent_type: AgentType,   // claude, codex, gemini, cursor, opencode
-  mode: Mode,              // plan, edit, ralph
-  cwd: string | null,      // Working directory
-  status: AgentStatus,      // running, completed, failed, stopped
-  started_at: Date,
-  completed_at: Date | null,
-  parent_session_id: string | null,
-  workspace_dir: string | null
-}
-```
-
-## Effort Levels (Model Mapping)
-
-Effort levels map to agent-specific models via `resolveEffortModelMap()` in `agents.ts`.
-
-| Level | Claude | Codex | Gemini | Cursor | OpenCode |
-|-------|---------|-------|---------|--------|----------|
-| fast | claude-haiku-4-5-20251001 | gpt-4o-mini | gemini-3-flash-preview | composer-1 | zai-coding-plan/glm-4.7-flash |
-| default | claude-sonnet-4-5 | gpt-5.3-codex | gemini-3-flash-preview | composer-1 | zai-coding-plan/glm-4.7 |
-| detailed | claude-opus-4-5 | gpt-5.1-codex-max | gemini-3-pro-preview | composer-1 | zai-coding-plan/glm-4.7 |
-
-Effort is passed to Spawn tool and resolved to model name via agent config.
-
-## Critical Gotchas
-
-### Codex JSON Arguments
-Codex `payload.arguments` field is a JSON **string**, not an object. Must `JSON.parse(payload.arguments)` before accessing.
-
-**Bad:** `const args = item.payload.arguments.command;`
-**Good:** `const args = JSON.parse(item.payload.arguments); const cmd = args.command;`
-
-### Spawn Returns Immediately
-Spawn tool returns `agent_id` right away - agent runs in background. Don't call Status immediately. Wait 2+ minutes for agent to make progress.
-
-### Delta Polling
-Always send `since` cursor from last Status response to avoid redundant token usage. Status without `since` returns all events (expensive).
-
-### Detached Processes
-Agents are spawned as detached background processes. They survive IDE restarts. Reconnect via Status/Tasks tools after restarting IDE.
-
-### Ralph Mode Safety
-Ralph mode warns if `cwd` is a dangerous path:
-- User home directory
-- `/`, `/System`, `/usr`, `/bin`, `/sbin`, `/etc`
-
-RALPH.md must exist in `cwd` before spawning ralph agent.
-
-### Process Groups
-Agent CLI is spawned with process group. SIGTERM/SIGKILL terminate entire process tree (including bash child processes).
-
-## Testing Strategy
-
-### No Mocks
-All tests use real services. No mocks, stubs, or fakes.
-
-### Test Fixtures
-Live test fixtures in `tests/testdata/` subdirectory:
-- `claude-agent-log-comprehensive.jsonl` - Real Claude session
-- `claude-summary-comprehensive.jsonl` - Real summary data
-- `codex-*` - Real Codex sessions
-- `gemini-*` - Real Gemini sessions
-- `cursor-*` - Real Cursor sessions
-
-### Test Files
-
-| File | Purpose |
-|------|---------|
-| `test_agents.test.ts` | AgentManager lifecycle, spawn, stop, cleanup |
-| `test_api.test.ts` | MCP tool handlers (spawn, status, stop, tasks) |
-| `test_parsers.test.ts` | Event normalization for all agent types |
-| `test_summarizer.test.ts` | Event collapsing, delta calculation |
-| `test_ralph.test.ts` | Ralph mode config, dangerous path detection |
-| `test_server.test.ts` | MCP server initialization, tool registration |
-| `test_version.test.ts` | Version checking, npm registry fetching |
-| `test_mcp_e2e.test.ts` | End-to-end MCP protocol tests |
-| `test_claude_live.test.ts` | Live Claude agent execution |
-| `test_codex_live.test.ts` | Live Codex agent execution |
-| `test_gemini_live.test.ts` | Live Gemini agent execution |
-| `test_cursor_live.test.ts` | Live Cursor agent execution |
-| `test_opencode_live.test.ts` | Live OpenCode agent execution |
-
-### Running Tests
-
-```bash
-cd agents-mcp
-bun install
-bun test
-```
-
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `AGENTS_MCP_DEFAULT_MODE` | Set default mode (`plan` or `edit`). Overrides server default. |
-| `AGENTS_MCP_RALPH_FILE` | Task file name for ralph mode (default: `RALPH.md`) |
-| `AGENTS_MCP_DISABLE_RALPH` | Disable ralph mode (set to `true` or `1`) |
-
-## Version Checking
-
-### Version Cache
-
-Located at `~/.agents/swarm/cache.json`:
-```json
-{
-  "version": {
-    "latest": "0.2.6",
-    "checkedAt": 17051234567890
-  }
-}
-```
-
-### Check Logic
-
-1. Load cache from disk (`loadCache()` in `version.ts`)
-2. If cache is fresh (< 12h TTL), use cached version
-3. Otherwise, fetch from npm registry (3s timeout)
-4. Update cache with latest version and timestamp
-5. Compare `current` vs `latest` - if outdated, build notice
-
-### Notice Building
-
-If version is outdated, `buildVersionNotice()` appends message to tool descriptions:
-```
-[New version available: 0.2.7, you are running 0.2.6. Run `npx -y @swarmify/agents-mcp@latest` to update.]
-```
-
-### Client Detection
-
-`detectClientFromName()` in `version.ts` identifies which agent CLI is calling:
-- Claude: checks for `AGENT_SESSION_ID` env var
-- Codex, Gemini: detected from process name or environment
-
-## File Operation Inference (file_ops.ts)
-
-`extractFileOpsFromBash()` parses bash command strings to extract file read/write/delete operations:
-
-**Write patterns:** `cat > path`, `echo >> path`, `sed -i path`, `tee path`
-**Read patterns:** `head path`, `tail path`, `cat path | grep`, `sed -n path`
-**Delete patterns:** `rm path`, `rm -rf path`
-
-Returns three arrays: `[filesRead, filesWritten, filesDeleted]`
-
-Used by parsers to track file operations from bash tool calls, even when agent doesn't explicitly log file operations.
-
-## What This Server Does NOT Do
-
-| Not This | That's The Orchestrator's Job |
-|----------|-------------------------------|
-| Scheduling | Decides when to spawn which agents |
-| Task assignment | Writes prompts, defines what to do |
-| Conflict resolution | Assigns non-overlapping files to agents |
-| Intelligence | Pure infrastructure - no decision-making |
-
-This server is the pipes and wires. Orchestrators are the intelligence.
+- Modifying rules, rulesets.
+- Merging or closing pull requests.
+- Creating or deleting repositories.
+- Releasing or deploying.
+- Force-pushing or rewriting published git history.
+
+## Rule improvement observations
+
+- Delegated agents must not modify rules directly.
+- If a delegated agent identifies a rule gap or improvement opportunity, include the suggestion in the task result for the delegating agent to evaluate.
+- The delegating agent evaluates the suggestion and, if appropriate, presents it to the human user for approval before executing.
+
+## Authority and scope
+
+- Delegated agents inherit the delegating agent's repository access scope but must not expand it.
+- Different agent platforms have different capabilities (sandboxing, network access, push permissions). Fail explicitly when a required capability is unavailable in the current environment rather than attempting workarounds.
+
+## Cost optimization (model selection)
+
+- When spawning agents, minimize the **total cost to achieve the goal**. Total cost includes model pricing, reasoning/thinking token consumption, context usage, and retry overhead.
+- Use the minimum reasoning effort level (e.g., low/medium/high/xhigh) that reliably produces correct output for the task; extended reasoning increases cost significantly.
+- Prefer newer-generation models at lower reasoning effort over older models at maximum reasoning effort when both can succeed; newer models often achieve equal quality with less thinking overhead.
+- Factor in context efficiency: a model that handles a task in one pass is cheaper than one that requires splitting.
+- A model that succeeds on the first attempt at slightly higher unit cost is cheaper overall than one that requires retries.
+
+## Parallel execution safety
+
+- Do not run multiple agents that modify the same files or repository concurrently.
+- Independent tasks across different repositories may run in parallel.
+- If two tasks target the same repository, assess conflict risk: non-overlapping files may run in parallel; overlapping files must run sequentially.
+- When in doubt, run sequentially to avoid merge conflicts and inconsistent state.
+
+Source: github:metyatech/agent-rules@HEAD/rules/global/planning-and-approval-gate.md
+
+# Planning and approval gate
+
+- Default to a two-phase workflow: clarify goal + plan first, execute after explicit requester approval.
+- In delegated mode (see Multi-agent delegation), the delegation itself constitutes plan approval. Do not re-request approval from the human user. If scope expansion is needed, fail back to the delegating agent.
+- If a request may require any state-changing work, you MUST first dialogue with the requester to clarify details and make the goal explicit. Do not proceed while the goal is ambiguous.
+- Allowed before approval:
+  - Clarifying questions and read-only inspection (reading files, searching, and `git status` / `git diff` / `git log`).
+  - Any unavoidable automated work triggered as a side-effect of those read-only commands.
+  - Any command execution that must not adversely affect program behavior or external systems (including changes made by tooling), such as:
+    - Installing/restoring dependencies using repo-standard tooling (lockfile changes are allowed).
+    - Running formatters/linters/typecheck/tests/builds (including auto-fix/formatting that modifies files).
+    - Running code generation/build steps that are deterministic and repo-scoped.
+    - Running these from clean → dirty → clean is acceptable; publishing/deploying/migrating is not.
+- Before any other state-changing execution (e.g., writing or modifying files by hand, changing runtime behavior, or running git commands beyond status/diff/log), do all of the following:
+  - Restate the request as Acceptance Criteria (AC) and verification methods, following "Delivery hard gates" (keep concise by default).
+  - Produce a written plan (use your planning tool when available) focused on the goal, approach, and verification checkpoints (keep concise by default; do not enumerate per-file implementation details or exact commands unless the requester asks).
+  - Confirm the plan with the requester, ask for approval explicitly, and wait for a clear "yes" before executing.
+  - Once the requester has approved a plan, proceed within that plan without re-requesting approval; re-request approval only when you change or expand the plan.
+  - Do not treat the original task request as plan approval; approval must be an explicit response to the presented plan.
+- If state-changing execution starts without the required post-plan "yes", stop immediately, report the gate miss, add/update a prevention rule, regenerate AGENTS.md, and then restart from the approval gate.
+- No other exceptions: even if the user requests immediate execution (e.g., "skip planning", "just do it"), treat that as a request to move quickly through this gate, not to bypass it.
+
+Source: github:metyatech/agent-rules@HEAD/rules/global/quality-testing-and-errors.md
+
+# Quality, testing, and error handling
+
+For AC definition, verification evidence, regression tests, and final reporting requirements, see Delivery hard gates.
+
+## Quality priority
+
+- Quality (correctness, safety, robustness, verifiability) takes priority over speed or convenience.
+
+## Verification
+
+- If you are unsure what constitutes the full suite, run the repo's default verify/CI commands rather than guessing.
+- Enforce via CI: run the full suite on pull requests and on pushes to the default branch, and make it a required status check for merges; if no CI harness exists, add one using repo-standard commands.
+- Configure required status checks on the default branch when you have permission; otherwise report the limitation.
+- Do not rely on smoke-only gating or scheduled-only full runs for correctness; merges must require the full suite.
+- Ensure commit-time automation (pre-commit or repo-native) runs the full suite and blocks commits.
+- Never disable checks, weaken assertions, loosen types, or add retries solely to make checks pass.
+- If the execution environment restricts test execution (no network, no database, sandboxed), run the available subset, document what was skipped, and ensure CI covers the remainder.
+
+## Tests (behavior changes)
+
+- Follow test-first: add/update tests, observe failure, implement the fix, then observe pass.
+- Cover success, failure, boundary, invalid input, and key state transitions (including first-run/cold-start vs subsequent-run behavior when relevant); include representative concurrency/retry/recovery when relevant.
+- Keep tests deterministic; minimize time/random/external I/O; inject when needed.
+- For deterministic output files, use full-content snapshot/golden tests.
+- Prefer making nondeterministic failures reproducible over adding sleeps/retries; do not mask flakiness.
+- For timing/order/race issues, prefer deterministic synchronization (events, versioned state, acks/handshakes) over fixed sleeps.
+- If a heuristic wait is unavoidable, it MUST be condition-based with a hard deadline and diagnostics, and requires explicit requester approval.
+- For integration boundaries (network/DB/external services/UI flows), add an integration/E2E/contract test that exercises the boundary; avoid unit-only coverage for integration bugs.
+- For non-trivial changes, create a small test matrix (scenarios × inputs × states) and cover the highest-risk combinations; document intentional gaps.
+
+## Feedback loops and root causes
+
+- Treat time-to-detect and time-to-fix as quality attributes; shorten the feedback loop with automation and observability rather than relying on manual QA.
+- For any defect fix or incident remediation, perform a brief root-cause classification: implementation mistake, design deficit, and/or ambiguous/incorrect requirements.
+- Feed the root cause upstream in the same change set: add or tighten tests/checks/alerts, update specs/acceptance criteria, and update design docs/ADRs when applicable.
+- If the failure should have been detected earlier, add a gate at the earliest reliable point (lint/typecheck/tests/CI required checks or runtime alerts/health checks); skipping this requires explicit user approval.
+- Record the prevention mechanism (what will catch it next time) in the PR description or issue comment; avoid "fixed" without a concrete feedback-loop improvement.
+
+## Exceptions
+
+- If required tests are impractical, document the coverage gap, provide a manual verification plan, and get explicit user approval before skipping.
+
+## Error handling and validation
+
+- Never swallow errors; fail fast or return early with explicit errors.
+- Error messages must reflect actual state and include relevant input context.
+- Validate config and external inputs at boundaries; fail with actionable guidance.
+- Log minimally but with diagnostic context; never log secrets or personal data.
+- Remove temporary debugging/instrumentation before the final patch.
+
+Source: github:metyatech/agent-rules@HEAD/rules/global/release-and-publication.md
+
+# Release and publication
+
+## Packaging and distribution
+
+- Include LICENSE in published artifacts (copyright holder: metyatech).
+- Do not ship build/test artifacts or local configs; ensure a clean environment can use the product via README steps.
+- Define a SemVer policy and document what counts as a breaking change.
+
+## Public repository metadata
+
+- For public repos, set GitHub Description, Topics, and Homepage.
+- Ensure required repo files exist: .github/workflows/ci.yml, issue templates, PR template, SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, CHANGELOG.md.
+- Configure CI to run the repo's standard lint/test/build commands.
+
+## Versioning and release flow
+
+- Update version metadata when release content changes; keep package version and Git tag consistent.
+- Create and push a release tag; create a GitHub Release based on CHANGELOG.
+- If asked to choose a version, decide it yourself.
+- When bumping a version, create the GitHub Release and publish the package in the same update.
+- For npm publishing, ask the user to run npm publish (do not execute it directly).
+- Before publishing, run required prep commands (e.g., npm install, npm test, npm pack --dry-run) and only proceed when ready.
+- If authentication fails during publish, ask the user to complete the publish step.
+- Run dependency security checks before release, address critical issues, and report results.
+- After publishing, update any locally installed copy to the newly published release and verify the resolved version.
+  - Completion gate: do not report “done” until this verification is completed (or the user explicitly declines).
+  - Must be expressed as explicit Acceptance Criteria and reported with outcomes (PASS/FAIL/N/A) + evidence in the final report:
+    - AC1 (registry): verify the published version exists in the registry (e.g., `npm view <pkg> version`).
+    - AC2 (fresh install): verify the latest package resolves and runs (e.g., `npx <pkg>@latest --version`).
+    - AC3 (global update, if applicable): if the package is installed globally, update it to the published version and verify (e.g., `npm ls -g <pkg> --depth=0`, `npm i -g <pkg>@latest`, then `<cmd> --version`).
+    - If AC3 is not applicable (not installed globally) or cannot be performed, mark it N/A and state the reason explicitly.
+  - For npm CLIs:
+    - If installed globally: check `npm ls -g <pkg> --depth=0`, update via `npm i -g <pkg>@latest` (or the published dist-tag), then verify with `<pkg> --version`.
+    - If not installed globally: skip the global update, and verify availability via `npx <pkg>@latest --version` (or the ecosystem-equivalent).
+
+## Published artifact requirements
+
+- Populate package metadata (name, description, repository, issues, homepage, engines).
+- Validate executable entrypoints and required shebangs so installed commands work.
+- If a repo represents a single tool/product, publish a single package (bundle related scripts).
+
+Source: github:metyatech/agent-rules@HEAD/rules/global/skill-authoring.md
+
+# Skill authoring standards
+
+## SKILL.md format (Agent Skills open standard)
+
+- Follow the Agent Skills open standard (agentskills.io/specification).
+- SKILL.md frontmatter must contain only `name` and `description`; do not add platform-specific fields.
+- `name`: lowercase alphanumeric and hyphens only, max 64 characters.
+- `description`: explain when the skill should and should not trigger; this is the only text used for skill selection.
+
+## Platform independence
+
+- SKILL.md body must be platform-agnostic: do not reference platform-specific tool names
+  (e.g., `Task`, `TeamCreate`, `codex exec`, Cursor-specific APIs).
+- Write instructions in terms of intent ("launch a background agent", "track tasks",
+  "create a team") and let each agent use its own tools.
+- Platform-specific invocation examples (`/skill` for Claude Code, `$skill` for Codex)
+  belong in README.md, not in SKILL.md.
+
+## Distribution
+
+- Each skill lives in its own repository.
+- Use clear, descriptive repository names (e.g., `skill-manager`).
+- Keep SKILL.md at the repository root for `npx skills add` compatibility.
+- Install and manage skills via `npx skills add <owner>/<repo>` (vercel-labs/skills);
+  do not build custom installers.
+
+## Publishing
+
+- Default to public repositories so skills are installable by anyone
+  via `npx skills add`.
+- Write SKILL.md and README.md with external users in mind:
+  assume no prior knowledge of internal conventions.
+- Include a LICENSE file (prefer MIT).
+
+## Content guidelines
+
+- Write SKILL.md body and README.md in English (developer-facing).
+- Keep instructions concise, action-oriented, and testable.
+- Do not duplicate rules already covered by AGENTS.md global rules
+  (e.g., TDD, verification, planning gates); reference them instead.
+
+Source: github:metyatech/agent-rules@HEAD/rules/global/user-identity-and-accounts.md
+
+# User identity and accounts
+
+- The user's name is "metyatech".
+- Any external reference using "metyatech" (GitHub org/user, npm scope, repos) is under the user's control.
+- The user has GitHub and npm accounts.
+- Use the gh CLI to verify GitHub details when needed.
+- When publishing, cloning, adding submodules, or splitting repos, prefer the user's "metyatech" ownership unless explicitly instructed otherwise.
+
+Source: github:metyatech/agent-rules@HEAD/rules/global/writing-and-documentation.md
+
+# Writing and documentation
+
+## User responses
+
+- Respond in Japanese unless the user requests otherwise.
+- Always report whether you committed and whether you pushed; include repo(s), branch(es), and commit hash(es) when applicable.
+- After completing a response, emit the Windows SystemSounds.Asterisk sound via PowerShell only when operating in direct mode (top-level agent).
+- If operating in delegated mode (spawned by another agent / sub-agent), do not emit notification sounds.
+- If operating as a manager/orchestrator, do not ask delegated sub-agents to emit sounds; emit at most once when the overall task is complete (direct mode only).
+
+## Developer-facing writing
+
+- Write developer documentation, code comments, and commit messages in English.
+- Rule modules are written in English.
+
+## README and docs
+
+- Every repository must include README.md covering overview/purpose, supported environments/compatibility, install/setup, usage examples, dev commands (build/test/lint/format), required env/config, release/deploy steps if applicable, and links to SECURITY.md / CONTRIBUTING.md / LICENSE / CHANGELOG.md when they exist.
+- For any change, assess documentation impact and update all affected docs in the same change set so docs match behavior (README, docs/, examples, comments, templates, ADRs/specs, diagrams).
+- If no documentation updates are needed, explain why in the final response.
+- For CLIs, document every parameter (required and optional) with a description and at least one example; also include at least one end-to-end example command.
+- Do not include user-specific local paths, fixed workspace directories, drive letters, or personal data in doc examples. Prefer repo-relative paths and placeholders so instructions work in arbitrary environments.
+
+## Markdown linking
+
+- When a Markdown document links to a local file, use a path relative to the Markdown file.
