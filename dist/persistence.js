@@ -78,8 +78,8 @@ function getDefaultAgentConfig(agentType) {
             enabled: true,
             models: {
                 fast: 'claude-haiku-4-5-20251001',
-                default: 'claude-sonnet-4-5',
-                detailed: 'claude-opus-4-5'
+                default: 'claude-sonnet-4-6',
+                detailed: 'claude-opus-4-6'
             },
             provider: 'anthropic'
         },
@@ -87,9 +87,9 @@ function getDefaultAgentConfig(agentType) {
             command: 'codex exec --sandbox danger-full-access \'{prompt}\' --json',
             enabled: true,
             models: {
-                fast: 'gpt-4o-mini',
+                fast: 'gpt-5.1-codex-mini',
                 default: 'gpt-5.3-codex',
-                detailed: 'gpt-5.1-codex-max'
+                detailed: 'gpt-5.3-codex'
             },
             provider: 'openai'
         },
