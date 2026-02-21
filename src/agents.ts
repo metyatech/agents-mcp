@@ -883,6 +883,8 @@ export class AgentProcess {
       return;
     }
 
+    let changed = false;
+
     if (this.status === AgentStatus.RUNNING) {
       const exitCode = await this.reapProcess();
       await this.readNewEvents();
@@ -896,15 +898,19 @@ export class AgentProcess {
           this.status = AgentStatus.COMPLETED;
         }
         this.completedAt = fallbackCompletion;
+        changed = true;
       }
     } else if (!this.completedAt) {
       await this.readNewEvents();
       const fallbackCompletion =
         this.getLatestEventTime() || this.startedAt || new Date();
       this.completedAt = fallbackCompletion;
+      changed = true;
     }
 
-    await this.saveMeta();
+    if (changed) {
+      await this.saveMeta();
+    }
   }
 
   private async reapProcess(): Promise<number | null> {
@@ -931,6 +937,7 @@ export class AgentManager {
   private constructorAgentConfigs: Record<AgentType, AgentConfig> | null = null;
 
   private constructorAgentsDir: string | null = null;
+  private initPromise: Promise<void> | null = null;
 
   constructor(
     maxAgents: number = 50,
@@ -961,6 +968,13 @@ export class AgentManager {
   }
 
   private async initialize(): Promise<void> {
+    if (!this.initPromise) {
+      this.initPromise = this.doInitialize();
+    }
+    return this.initPromise;
+  }
+
+  private async doInitialize(): Promise<void> {
     this.agentsDir = this.constructorAgentsDir || await getAgentsDir();
     await fs.mkdir(this.agentsDir, { recursive: true });
 
@@ -1422,6 +1436,12 @@ export class AgentManager {
     model: string | null = null
   ): Promise<AgentProcess> {
     await this.initialize();
+
+    // Re-fetch canonical instance from the agents map to avoid stale references
+    const canonical = this.agents.get(originalAgent.agentId);
+    if (canonical) {
+      originalAgent = canonical;
+    }
 
     const agentType = originalAgent.agentType;
 

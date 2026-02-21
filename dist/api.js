@@ -179,6 +179,10 @@ parentSessionId) {
             errors,
             diagnostics: diagPayload,
             cursor: agentTimestamp, // Return latest timestamp for this agent
+            conversation_turn: agent.conversationTurn,
+            original_agent_id: agent.originalAgentId,
+            reply_agent_ids: agent.replyAgentIds,
+            session_id: agent.sessionId,
         });
     }
     console.error(`[status] ${lookupLabel}: returning ${agents.length}/${allAgents.length} agents (running=${counts.running}, completed=${counts.completed}, failed=${counts.failed}, stopped=${counts.stopped})`);
@@ -299,5 +303,23 @@ export async function handleStop(manager, taskName, agentId) {
             not_found: [],
         };
     }
+}
+export async function handleReply(manager, agentId, message) {
+    console.error(`[reply] Sending reply to agent ${agentId}...`);
+    const agent = await manager.get(agentId);
+    if (!agent) {
+        throw new Error(`Agent '${agentId}' not found`);
+    }
+    const replyAgent = await manager.reply(agent, message);
+    console.error(`[reply] Spawned reply agent ${replyAgent.agentId} (turn ${replyAgent.conversationTurn}) for original ${agentId}`);
+    return {
+        agent_id: replyAgent.agentId,
+        original_agent_id: replyAgent.originalAgentId || agentId,
+        agent_type: replyAgent.agentType,
+        task_name: replyAgent.taskName,
+        conversation_turn: replyAgent.conversationTurn,
+        status: replyAgent.status,
+        started_at: replyAgent.startedAt.toISOString(),
+    };
 }
 //# sourceMappingURL=api.js.map

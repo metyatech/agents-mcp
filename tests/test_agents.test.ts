@@ -584,6 +584,74 @@ describe('AgentManager', () => {
     expect(all.length).toBe(0);
   });
 
+  test('initialize() is idempotent - loadExistingAgents runs only once', async () => {
+    // Create an agent on disk so loadExistingAgents has something to load
+    const agentDir = path.join(testDir, 'idem-test');
+    await fs.mkdir(agentDir, { recursive: true });
+    const agent = new AgentProcess(
+      'idem-test', 'task-1', 'claude', 'test prompt',
+      null, 'plan', null, AgentStatus.COMPLETED,
+      new Date(), new Date(), testDir
+    );
+    await agent.saveMeta();
+
+    // Create a fresh manager pointing at the same dir and wait for init
+    const mgr = new AgentManager(50, 10, testDir);
+    await mgr['initialize']();
+    const firstLoad = await mgr.listAll();
+    expect(firstLoad.length).toBe(1);
+
+    // Modify the in-memory agent's replyAgentIds and save to disk
+    const loaded = mgr['agents'].get('idem-test')!;
+    loaded.replyAgentIds.push('reply-1');
+    await loaded.saveMeta();
+
+    // Tamper with disk: overwrite with empty replyAgentIds to simulate a stale reload
+    const staleAgent = new AgentProcess(
+      'idem-test', 'task-1', 'claude', 'test prompt',
+      null, 'plan', null, AgentStatus.COMPLETED,
+      new Date(), new Date(), testDir
+    );
+    await staleAgent.saveMeta(); // writes reply_agent_ids: [] to disk
+
+    // Second initialize() should NOT reload from disk (idempotent via Promise)
+    await mgr['initialize']();
+    const afterSecondInit = mgr['agents'].get('idem-test')!;
+    // In-memory state preserved despite stale disk data
+    expect(afterSecondInit.replyAgentIds).toEqual(['reply-1']);
+  });
+
+  test('updateStatusFromProcess does not saveMeta when status unchanged', async () => {
+    const agentDir = path.join(testDir, 'no-save-test');
+    await fs.mkdir(agentDir, { recursive: true });
+    const startedAt = new Date(Date.now() - 60000);
+    const completedAt = new Date(Date.now() - 30000);
+    const agent = new AgentProcess(
+      'no-save-test', 'task-1', 'claude', 'test prompt',
+      null, 'plan', null, AgentStatus.COMPLETED,
+      startedAt, completedAt, testDir
+    );
+    agent.replyAgentIds = ['existing-reply'];
+    await agent.saveMeta();
+
+    // Reload from disk to get a clean instance
+    const reloaded = await AgentProcess.loadFromDisk('no-save-test', testDir);
+    expect(reloaded).not.toBeNull();
+    expect(reloaded!.replyAgentIds).toEqual(['existing-reply']);
+
+    // Spy on saveMeta - status is already COMPLETED with completedAt set and
+    // pid is null, so updateStatusFromProcess should return early without saving
+    let saveMetaCalled = false;
+    const originalSave = reloaded!.saveMeta.bind(reloaded!);
+    reloaded!.saveMeta = async () => {
+      saveMetaCalled = true;
+      return originalSave();
+    };
+
+    await reloaded!.updateStatusFromProcess();
+    expect(saveMetaCalled).toBe(false);
+  });
+
   test('should return null for nonexistent agent', async () => {
     const agent = await manager.get('nonexistent');
     expect(agent).toBeNull();

@@ -7,6 +7,15 @@ export interface SpawnResult {
     status: string;
     started_at: string;
 }
+export interface ReplyResult {
+    agent_id: string;
+    original_agent_id: string;
+    agent_type: string;
+    task_name: string;
+    conversation_turn: number;
+    status: string;
+    started_at: string;
+}
 export interface AgentStatusDetail {
     agent_id: string;
     agent_type: string;
@@ -31,6 +40,10 @@ export interface AgentStatusDetail {
         tail_errors: string[];
     };
     cursor: string;
+    conversation_turn?: number;
+    original_agent_id?: string | null;
+    reply_agent_ids?: string[];
+    session_id?: string | null;
 }
 export interface TaskStatusResult {
     task_name: string;
@@ -70,4 +83,5 @@ export declare function handleTasks(manager: AgentManager, limit?: number): Prom
 export declare function handleStop(manager: AgentManager, taskName: string, agentId?: string): Promise<StopResult | {
     error: string;
 }>;
+export declare function handleReply(manager: AgentManager, agentId: string, message: string): Promise<ReplyResult>;
 //# sourceMappingURL=api.d.ts.map

@@ -541,10 +541,14 @@ export class AgentProcess {
     startedAt = new Date();
     completedAt = null;
     parentSessionId = null;
+    sessionId = null;
+    conversationTurn = 0;
+    originalAgentId = null;
+    replyAgentIds = [];
     eventsCache = [];
     lastReadPos = 0;
     baseDir = null;
-    constructor(agentId, taskName, agentType, prompt, cwd = null, mode = 'plan', pid = null, status = AgentStatus.RUNNING, startedAt = new Date(), completedAt = null, baseDir = null, parentSessionId = null, workspaceDir = null) {
+    constructor(agentId, taskName, agentType, prompt, cwd = null, mode = 'plan', pid = null, status = AgentStatus.RUNNING, startedAt = new Date(), completedAt = null, baseDir = null, parentSessionId = null, workspaceDir = null, sessionId = null, conversationTurn = 0, originalAgentId = null, replyAgentIds = []) {
         this.agentId = agentId;
         this.taskName = taskName;
         this.agentType = agentType;
@@ -558,6 +562,10 @@ export class AgentProcess {
         this.completedAt = completedAt;
         this.baseDir = baseDir;
         this.parentSessionId = parentSessionId;
+        this.sessionId = sessionId;
+        this.conversationTurn = conversationTurn;
+        this.originalAgentId = originalAgentId;
+        this.replyAgentIds = replyAgentIds;
     }
     get isEditMode() {
         return this.mode === 'edit';
@@ -585,6 +593,10 @@ export class AgentProcess {
             mode: this.mode,
             parent_session_id: this.parentSessionId,
             workspace_dir: this.workspaceDir,
+            session_id: this.sessionId,
+            conversation_turn: this.conversationTurn,
+            original_agent_id: this.originalAgentId,
+            reply_agent_ids: this.replyAgentIds,
         };
     }
     duration() {
@@ -665,6 +677,10 @@ export class AgentProcess {
                     for (const event of events) {
                         event.timestamp = resolvedTimestamp;
                         this.eventsCache.push(event);
+                        // Extract session_id from init events for resume/reply support
+                        if (event.type === 'init' && event.session_id && !this.sessionId) {
+                            this.sessionId = event.session_id;
+                        }
                         if (event.type === 'result' || event.type === 'turn.completed' || event.type === 'thread.completed') {
                             if (event.status === 'success' || event.type === 'turn.completed') {
                                 this.status = AgentStatus.COMPLETED;
@@ -728,6 +744,10 @@ export class AgentProcess {
             started_at: this.startedAt.toISOString(),
             completed_at: this.completedAt?.toISOString() || null,
             parent_session_id: this.parentSessionId,
+            session_id: this.sessionId,
+            conversation_turn: this.conversationTurn,
+            original_agent_id: this.originalAgentId,
+            reply_agent_ids: this.replyAgentIds,
         };
         const metaPath = await this.getMetaPath();
         await fs.writeFile(metaPath, JSON.stringify(meta, null, 2));
@@ -745,7 +765,7 @@ export class AgentProcess {
         try {
             const metaContent = await fs.readFile(metaPath, 'utf-8');
             const meta = JSON.parse(metaContent);
-            const agent = new AgentProcess(meta.agent_id, meta.task_name || 'default', meta.agent_type, meta.prompt, meta.cwd || null, meta.mode === 'edit' ? 'edit' : 'plan', meta.pid || null, AgentStatus[meta.status] || AgentStatus.RUNNING, new Date(meta.started_at), meta.completed_at ? new Date(meta.completed_at) : null, baseDir, meta.parent_session_id || null, meta.workspace_dir || null);
+            const agent = new AgentProcess(meta.agent_id, meta.task_name || 'default', meta.agent_type, meta.prompt, meta.cwd || null, meta.mode === 'edit' ? 'edit' : 'plan', meta.pid || null, AgentStatus[meta.status] || AgentStatus.RUNNING, new Date(meta.started_at), meta.completed_at ? new Date(meta.completed_at) : null, baseDir, meta.parent_session_id || null, meta.workspace_dir || null, meta.session_id || null, meta.conversation_turn || 0, meta.original_agent_id || null, Array.isArray(meta.reply_agent_ids) ? meta.reply_agent_ids : []);
             return agent;
         }
         catch {
@@ -770,6 +790,7 @@ export class AgentProcess {
             await this.readNewEvents();
             return;
         }
+        let changed = false;
         if (this.status === AgentStatus.RUNNING) {
             const exitCode = await this.reapProcess();
             await this.readNewEvents();
@@ -782,14 +803,18 @@ export class AgentProcess {
                     this.status = AgentStatus.COMPLETED;
                 }
                 this.completedAt = fallbackCompletion;
+                changed = true;
             }
         }
         else if (!this.completedAt) {
             await this.readNewEvents();
             const fallbackCompletion = this.getLatestEventTime() || this.startedAt || new Date();
             this.completedAt = fallbackCompletion;
+            changed = true;
         }
-        await this.saveMeta();
+        if (changed) {
+            await this.saveMeta();
+        }
     }
     async reapProcess() {
         if (!this.pid)
@@ -815,6 +840,7 @@ export class AgentManager {
     agentConfigs;
     constructorAgentConfigs = null;
     constructorAgentsDir = null;
+    initPromise = null;
     constructor(maxAgents = 50, maxConcurrent = 10, agentsDir = null, defaultMode = null, filterByCwd = null, cleanupAgeDays = 7, agentConfigs = null) {
         this.maxAgents = maxAgents;
         this.maxConcurrent = maxConcurrent;
@@ -833,6 +859,12 @@ export class AgentManager {
         return this.agentsDir;
     }
     async initialize() {
+        if (!this.initPromise) {
+            this.initPromise = this.doInitialize();
+        }
+        return this.initPromise;
+    }
+    async doInitialize() {
         this.agentsDir = this.constructorAgentsDir || await getAgentsDir();
         await fs.mkdir(this.agentsDir, { recursive: true });
         // Set defaults if no config provided
@@ -1160,6 +1192,155 @@ export class AgentManager {
                 break;
         }
         return ralphCmd;
+    }
+    static REPLY_SUPPORTED_AGENTS = new Set(['claude', 'gemini', 'copilot']);
+    buildReplyCommand(agentType, message, sessionId, mode, model, cwd = null) {
+        const isEditMode = mode === 'edit';
+        switch (agentType) {
+            case 'claude': {
+                if (!sessionId)
+                    throw new Error('Claude reply requires a session_id');
+                const cmd = ['claude', '-r', sessionId, '-p', message, '--output-format', 'stream-json', '--verbose'];
+                const permMode = isEditMode ? 'acceptEdits' : 'plan';
+                cmd.push('--permission-mode', permMode);
+                const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
+                cmd.push('--settings', settingsPath);
+                cmd.push('--model', model);
+                if (cwd)
+                    cmd.push('--add-dir', cwd);
+                return cmd;
+            }
+            case 'gemini': {
+                const cmd = ['gemini', '--resume', 'latest', '-p', message, '--output-format', 'stream-json'];
+                cmd.push('--model', model);
+                if (isEditMode) {
+                    cmd.push('--yolo');
+                }
+                else {
+                    cmd.push('--approval-mode', 'plan');
+                }
+                return cmd;
+            }
+            case 'copilot': {
+                const cmd = ['copilot', '--continue', '-p', message, '-s'];
+                cmd.push('--model', model);
+                if (isEditMode) {
+                    cmd.push('--allow-all-tools', '--allow-all-paths', '--no-ask-user');
+                }
+                return cmd;
+            }
+            default:
+                throw new Error(`Reply is not supported for agent type '${agentType}'. Supported: claude, gemini, copilot`);
+        }
+    }
+    async reply(originalAgent, message, effort = 'default', model = null) {
+        await this.initialize();
+        // Re-fetch canonical instance from the agents map to avoid stale references
+        const canonical = this.agents.get(originalAgent.agentId);
+        if (canonical) {
+            originalAgent = canonical;
+        }
+        const agentType = originalAgent.agentType;
+        if (!AgentManager.REPLY_SUPPORTED_AGENTS.has(agentType)) {
+            throw new Error(`Reply is not supported for agent type '${agentType}'. Supported: ${[...AgentManager.REPLY_SUPPORTED_AGENTS].join(', ')}`);
+        }
+        if (originalAgent.status === AgentStatus.RUNNING) {
+            throw new Error(`Cannot reply to agent ${originalAgent.agentId} — it is still running. Wait for it to complete first.`);
+        }
+        // Ensure events are read so sessionId is populated
+        await originalAgent.readNewEvents();
+        // For Claude and Gemini, session_id is required; Copilot uses --continue
+        if (agentType !== 'copilot' && !originalAgent.sessionId) {
+            throw new Error(`Cannot reply to agent ${originalAgent.agentId} — no session_id found. ` +
+                `The agent may not have emitted an init event with a session_id.`);
+        }
+        const running = await this.listRunning();
+        if (running.length >= this.maxConcurrent) {
+            throw new Error(`Maximum concurrent agents (${this.maxConcurrent}) reached. Wait for an agent to complete or stop one first.`);
+        }
+        const [available, pathOrError] = checkCliAvailable(agentType);
+        if (!available) {
+            throw new Error(pathOrError || 'CLI tool not available');
+        }
+        const resolvedModel = model?.trim() || this.effortModelMap[effort][agentType];
+        const resolvedMode = originalAgent.mode;
+        const conversationTurn = originalAgent.conversationTurn + 1;
+        const cmd = this.buildReplyCommand(agentType, message, originalAgent.sessionId, resolvedMode, resolvedModel, originalAgent.cwd);
+        const agentId = randomUUID().substring(0, 8);
+        const agent = new AgentProcess(agentId, originalAgent.taskName, agentType, message, originalAgent.cwd, resolvedMode, null, AgentStatus.RUNNING, new Date(), null, this.agentsDir, originalAgent.parentSessionId, originalAgent.workspaceDir, originalAgent.sessionId, conversationTurn, originalAgent.originalAgentId || originalAgent.agentId, []);
+        const agentDir = await agent.getAgentDir();
+        try {
+            await fs.mkdir(agentDir, { recursive: true });
+        }
+        catch (err) {
+            this.agents.delete(agent.agentId);
+            throw new Error(`Failed to create agent directory: ${err.message}`);
+        }
+        console.error(`Spawning reply ${agentType} agent ${agentId} (turn ${conversationTurn}): ${cmd.slice(0, 3).join(' ')}...`);
+        try {
+            const stdoutPath = await agent.getStdoutPath();
+            let spawnCmd;
+            let spawnArgs;
+            if (process.platform === 'win32') {
+                const ps1 = buildWindowsSpawnPs1(cmd, stdoutPath, originalAgent.cwd || process.cwd());
+                const tempScript = path.join(os.tmpdir(), `swarm-agent-${agentId}.ps1`);
+                await fs.writeFile(tempScript, ps1, 'utf-8');
+                await fs.mkdir(path.dirname(stdoutPath), { recursive: true });
+                spawnCmd = 'pwsh.exe';
+                spawnArgs = ['-NoProfile', '-NonInteractive', '-File', tempScript];
+            }
+            else {
+                const stdoutFile = await fs.open(stdoutPath, 'w');
+                spawnCmd = cmd[0];
+                spawnArgs = cmd.slice(1);
+                const stdoutFd = stdoutFile.fd;
+                stdoutFile.close().catch(() => { });
+                const childEnv = { ...process.env };
+                delete childEnv['CLAUDECODE'];
+                const childProcess = spawn(spawnCmd, spawnArgs, {
+                    stdio: ['ignore', stdoutFd, stdoutFd],
+                    cwd: originalAgent.cwd || undefined,
+                    detached: true,
+                    shell: false,
+                    env: childEnv,
+                });
+                childProcess.unref();
+                agent.pid = childProcess.pid || null;
+                await agent.saveMeta();
+                // Link original → reply
+                originalAgent.replyAgentIds.push(agentId);
+                await originalAgent.saveMeta();
+                this.agents.set(agentId, agent);
+                await this.cleanupOldAgents();
+                console.error(`Spawned reply agent ${agentId} with PID ${agent.pid}`);
+                return agent;
+            }
+            const childEnv = { ...process.env };
+            delete childEnv['CLAUDECODE'];
+            const isWindowsPs1 = process.platform === 'win32';
+            const childProcess = spawn(spawnCmd, spawnArgs, {
+                stdio: ['ignore', 'ignore', 'ignore'],
+                cwd: originalAgent.cwd || undefined,
+                detached: !isWindowsPs1,
+                shell: false,
+                env: childEnv,
+            });
+            childProcess.unref();
+            agent.pid = childProcess.pid || null;
+            await agent.saveMeta();
+            // Link original → reply
+            originalAgent.replyAgentIds.push(agentId);
+            await originalAgent.saveMeta();
+        }
+        catch (err) {
+            await this.cleanupPartialAgent(agent);
+            console.error(`Failed to spawn reply agent ${agentId}:`, err);
+            throw new Error(`Failed to spawn reply agent: ${err.message}`);
+        }
+        this.agents.set(agentId, agent);
+        await this.cleanupOldAgents();
+        console.error(`Spawned reply agent ${agentId} with PID ${agent.pid}`);
+        return agent;
     }
     async get(agentId) {
         await this.initialize();

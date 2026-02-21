@@ -53,10 +53,14 @@ export declare class AgentProcess {
     startedAt: Date;
     completedAt: Date | null;
     parentSessionId: string | null;
+    sessionId: string | null;
+    conversationTurn: number;
+    originalAgentId: string | null;
+    replyAgentIds: string[];
     private eventsCache;
     private lastReadPos;
     private baseDir;
-    constructor(agentId: string, taskName: string, agentType: AgentType, prompt: string, cwd?: string | null, mode?: Mode, pid?: number | null, status?: AgentStatus, startedAt?: Date, completedAt?: Date | null, baseDir?: string | null, parentSessionId?: string | null, workspaceDir?: string | null);
+    constructor(agentId: string, taskName: string, agentType: AgentType, prompt: string, cwd?: string | null, mode?: Mode, pid?: number | null, status?: AgentStatus, startedAt?: Date, completedAt?: Date | null, baseDir?: string | null, parentSessionId?: string | null, workspaceDir?: string | null, sessionId?: string | null, conversationTurn?: number, originalAgentId?: string | null, replyAgentIds?: string[]);
     get isEditMode(): boolean;
     getAgentDir(): Promise<string>;
     getStdoutPath(): Promise<string>;
@@ -88,9 +92,11 @@ export declare class AgentManager {
     private agentConfigs;
     private constructorAgentConfigs;
     private constructorAgentsDir;
+    private initPromise;
     constructor(maxAgents?: number, maxConcurrent?: number, agentsDir?: string | null, defaultMode?: Mode | null, filterByCwd?: string | null, cleanupAgeDays?: number, agentConfigs?: Record<AgentType, AgentConfig> | null);
     getAgentsDirPath(): string;
     private initialize;
+    private doInitialize;
     getDefaultMode(): Mode;
     setModelOverrides(agentConfigs: Record<AgentType, AgentConfig>): void;
     private loadExistingAgents;
@@ -98,6 +104,9 @@ export declare class AgentManager {
     private buildCommand;
     private applyEditMode;
     private applyRalphMode;
+    private static readonly REPLY_SUPPORTED_AGENTS;
+    buildReplyCommand(agentType: AgentType, message: string, sessionId: string | null, mode: Mode, model: string, cwd?: string | null): string[];
+    reply(originalAgent: AgentProcess, message: string, effort?: EffortLevel, model?: string | null): Promise<AgentProcess>;
     get(agentId: string): Promise<AgentProcess | null>;
     listAll(): Promise<AgentProcess[]>;
     listRunning(): Promise<AgentProcess[]>;
