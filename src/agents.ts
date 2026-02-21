@@ -275,7 +275,7 @@ function loadDefaultAgentConfigs(): Record<AgentType, AgentConfig> {
   // Use hardcoded defaults for backward compatibility with synchronous initialization
   return {
     claude: {
-      command: 'claude -p \'{prompt}\' --output-format stream-json --json',
+      command: 'claude -p \'{prompt}\' --output-format stream-json',
       enabled: true,
       models: {
         fast: 'claude-haiku-4-5-20251001',

@@ -122,7 +122,7 @@ async function ensureConfigPath(): Promise<string> {
 function getDefaultAgentConfig(agentType: AgentType): AgentConfig {
   const defaults: Record<AgentType, AgentConfig> = {
     claude: {
-      command: 'claude -p \'{prompt}\' --output-format stream-json --json',
+      command: 'claude -p \'{prompt}\' --output-format stream-json',
       enabled: true,
       models: {
         fast: 'claude-haiku-4-5-20251001',

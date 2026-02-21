@@ -243,7 +243,7 @@ Checks which agent CLIs are installed using `checkCliAvailable()` in `agents.ts`
 {
   "agents": {
     "claude": {
-      "command": "claude -p '{prompt}' --output-format stream-json --json",
+      "command": "claude -p '{prompt}' --output-format stream-json",
       "enabled": true,
       "models": {
         "fast": "claude-haiku-4-5-20251001",
