@@ -1083,6 +1083,96 @@ Write a summary of completed tasks.
       }
     });
 
+  });
+
+  describe('handleStatus with wait', () => {
+    test('should return immediately when wait=true and no agents are running', async () => {
+      console.log('\n--- TEST: wait=true, all agents already done ---');
+
+      const agent = new AgentProcess('wait-done-1', 'wait-task-done', 'codex', 'Work', null, 'plan', null, AgentStatus.COMPLETED);
+      manager['agents'].set('wait-done-1', agent);
+
+      const before = Date.now();
+      const result = await handleStatus(manager, 'wait-task-done', undefined, undefined, null, true, 5000);
+      const elapsed = Date.now() - before;
+
+      expect(result.summary.running).toBe(0);
+      expect(result.summary.completed).toBe(1);
+      expect(result.timed_out).toBeUndefined();
+      // Should return almost immediately (well under the 5s timeout)
+      expect(elapsed).toBeLessThan(2000);
+    });
+
+    test('should return immediately when wait=false (default)', async () => {
+      console.log('\n--- TEST: wait=false, agents still running ---');
+
+      const agent = new AgentProcess('wait-noblock', 'wait-task-noblock', 'codex', 'Work', null, 'plan', null, AgentStatus.RUNNING);
+      manager['agents'].set('wait-noblock', agent);
+
+      const before = Date.now();
+      const result = await handleStatus(manager, 'wait-task-noblock');
+      const elapsed = Date.now() - before;
+
+      expect(result.summary.running).toBe(1);
+      expect(result.timed_out).toBeUndefined();
+      expect(elapsed).toBeLessThan(2000);
+    });
+
+    test('should time out and set timed_out=true when agents stay running', async () => {
+      console.log('\n--- TEST: wait=true, times out ---');
+
+      const agent = new AgentProcess('wait-timeout-1', 'wait-task-timeout', 'codex', 'Work', null, 'plan', null, AgentStatus.RUNNING);
+      manager['agents'].set('wait-timeout-1', agent);
+
+      const before = Date.now();
+      const result = await handleStatus(manager, 'wait-task-timeout', undefined, undefined, null, true, 2000);
+      const elapsed = Date.now() - before;
+
+      expect(result.summary.running).toBe(1);
+      expect(result.timed_out).toBe(true);
+      // Should have waited approximately 2s (with some tolerance for poll intervals)
+      expect(elapsed).toBeGreaterThanOrEqual(1500);
+      expect(elapsed).toBeLessThan(5000);
+    });
+
+    test('should clamp timeout to max 600000ms', async () => {
+      console.log('\n--- TEST: timeout clamped to 600000ms ---');
+
+      // We can't actually wait 10+ minutes, but we verify the agent completes
+      // before timeout so we just test that huge values don't cause issues
+      const agent = new AgentProcess('wait-clamp-1', 'wait-task-clamp', 'codex', 'Work', null, 'plan', null, AgentStatus.COMPLETED);
+      manager['agents'].set('wait-clamp-1', agent);
+
+      const result = await handleStatus(manager, 'wait-task-clamp', undefined, undefined, null, true, 999999999);
+
+      expect(result.summary.running).toBe(0);
+      expect(result.timed_out).toBeUndefined();
+    });
+
+    test('should return when running agent completes during wait', async () => {
+      console.log('\n--- TEST: wait=true, agent completes during wait ---');
+
+      const agent = new AgentProcess('wait-complete-1', 'wait-task-complete', 'codex', 'Work', null, 'plan', null, AgentStatus.RUNNING);
+      manager['agents'].set('wait-complete-1', agent);
+
+      // Simulate the agent completing after 1.5 seconds
+      setTimeout(() => {
+        agent.status = AgentStatus.COMPLETED;
+        agent.completedAt = new Date();
+      }, 1500);
+
+      const before = Date.now();
+      const result = await handleStatus(manager, 'wait-task-complete', undefined, undefined, null, true, 10000);
+      const elapsed = Date.now() - before;
+
+      expect(result.summary.running).toBe(0);
+      expect(result.summary.completed).toBe(1);
+      expect(result.timed_out).toBeUndefined();
+      // Should have waited ~1.5s (agent completion) + up to 1s (poll interval)
+      expect(elapsed).toBeGreaterThanOrEqual(1000);
+      expect(elapsed).toBeLessThan(5000);
+    });
+
     test('should include conversation metadata in status output', async () => {
       console.log('\n--- TEST: conversation metadata in status ---');
 

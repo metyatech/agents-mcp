@@ -194,6 +194,14 @@ CURSOR SUPPORT: Send 'since' parameter (ISO timestamp from previous response's '
               type: 'string',
               description: 'Optional ISO timestamp - return only events after this time. Use cursor from previous response to get delta updates.',
             },
+            wait: {
+              type: 'boolean',
+              description: 'Block until all agents in the task are no longer running, or timeout is reached.',
+            },
+            timeout: {
+              type: 'number',
+              description: 'Max wait time in milliseconds when wait=true. Defaults to 60000 (60s). Max 600000 (10min).',
+            },
           },
           required: ['task_name'],
         },
@@ -304,7 +312,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         (args.task_name as string | undefined) || null,
         args.filter as string | undefined,
         args.since as string | undefined,
-        (args.parent_session_id as string | undefined) || null
+        (args.parent_session_id as string | undefined) || null,
+        args.wait as boolean | undefined,
+        args.timeout as number | undefined
       );
     } else if (normalizedName === 'stop') {
       if (!args) {
