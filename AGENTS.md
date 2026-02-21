@@ -60,6 +60,12 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/autonomous-operations.md
 - If you state a persistent workflow change (e.g., `from now on`, `I'll always`), immediately propose the corresponding rule update and request approval in the same task; do not leave it as an unrecorded promise. When operating under a multi-agent-delegation model, follow that rule module's guidance on restricted operations before proposing changes.
 - Because session memory resets between tasks, treat rule files as persistent memory; when any issue or avoidable mistake occurs, update rules in the same task to prevent recurrence.
 - Treat these rules as the source of truth; do not override them with repository conventions. If a repo conflicts, update the repo to comply or update the rules to encode the exception; do not make undocumented exceptions.
+
+## Skill role persistence
+
+- When the `manager` skill is invoked in a session, treat its role as session-scoped and continue operating as a manager/orchestrator for the remainder of the session.
+- Do not revert to a direct-implementation posture mid-session unless the user explicitly asks to stop using the manager role/skill or selects a different role.
+
 - When something is unclear, investigate to resolve it; do not proceed with unresolved material uncertainty. If still unclear, ask and include what you checked.
 - Do not proceed based on assumptions or guesses without explicit user approval; hypotheses may be discussed but must not drive action.
 - Make decisions explicit when they affect scope, risk, cost, or irreversibility.
@@ -345,6 +351,20 @@ The following operations require explicit delegation from the delegating agent o
 Source: github:metyatech/agent-rules@HEAD/rules/global/planning-and-approval-gate.md
 
 # Planning and approval gate
+
+## Approval waiver (trivial tasks)
+
+- In direct mode, you MAY proceed without asking for explicit approval when the user request is a trivial operational check and the action is low-risk and reversible.
+- Allowed under this waiver:
+  - Read-only inspection and verification (including running linters/tests/builds) that does not modify repo files.
+  - Spawning a sub-agent for a read-only smoke check (no repo writes; temp-only and cleaned up).
+  - Creating temporary files only under the OS temp directory (and deleting them during the task).
+- Not allowed under this waiver (approval is still required):
+  - Any manual edit of repository files, configuration files, or rule files.
+  - Installing/uninstalling dependencies or changing tool versions.
+  - Git operations beyond status/diff/log (commit/push/merge/release).
+  - Any external side effects (deployments, publishing, API writes, account/permission changes).
+- If there is any meaningful uncertainty about impact, request approval as usual.
 
 - Default to a two-phase workflow: clarify goal + plan first, execute after explicit requester approval.
 - In delegated mode (see Multi-agent delegation), the delegation itself constitutes plan approval. Do not re-request approval from the human user. If scope expansion is needed, fail back to the delegating agent.
