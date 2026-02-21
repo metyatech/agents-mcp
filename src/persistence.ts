@@ -132,7 +132,7 @@ function getDefaultAgentConfig(agentType: AgentType): AgentConfig {
       provider: 'anthropic'
     },
     codex: {
-      command: 'codex exec --sandbox workspace-write \'{prompt}\' --json',
+      command: 'codex exec --dangerously-bypass-approvals-and-sandbox \'{prompt}\' --json',
       enabled: true,
       models: {
         fast: 'gpt-4o-mini',

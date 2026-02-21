@@ -217,7 +217,7 @@ function ensureGeminiHeadlessFlag(cmd, promptText) {
 }
 // Base commands for plan mode (read-only, may prompt for confirmation)
 export const AGENT_COMMANDS = {
-    codex: ['codex', 'exec', '--sandbox', 'workspace-write', '{prompt}', '--json'],
+    codex: ['codex', 'exec', '--dangerously-bypass-approvals-and-sandbox', '{prompt}', '--json'],
     cursor: ['cursor-agent', '-p', '--output-format', 'stream-json', '{prompt}'],
     gemini: ['gemini', '-p', '{prompt}', '--output-format', 'stream-json'],
     claude: ['claude', '-p', '--verbose', '{prompt}', '--output-format', 'stream-json', '--permission-mode', 'plan'],
