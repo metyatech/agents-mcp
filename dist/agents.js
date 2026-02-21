@@ -97,7 +97,10 @@ export function buildWindowsSpawnPs1(cmd, stdoutPath, workingDirectory) {
         `$errTask = $p.StandardError.ReadToEndAsync()`,
         `$p.WaitForExit()`,
         `[void][System.Threading.Tasks.Task]::WhenAll($outTask, $errTask)`,
-        `[System.IO.File]::WriteAllText('${psEsc(stdoutPath)}', $outTask.Result + $errTask.Result, $enc)`,
+        // Append a JSON sentinel line with the real exit code so readNewEvents() can
+        // determine the correct COMPLETED/FAILED status without guessing.
+        `$exitJson = '{"__exit_code__":' + $p.ExitCode.ToString() + '}'`,
+        `[System.IO.File]::WriteAllText('${psEsc(stdoutPath)}', $outTask.Result + $errTask.Result + \`n + $exitJson + \`n, $enc)`,
     ];
     return psLines.join('\n');
 }
@@ -644,6 +647,19 @@ export class AgentProcess {
             for (const line of lines) {
                 try {
                     const rawEvent = JSON.parse(line);
+                    // Exit code sentinel written by buildWindowsSpawnPs1() — use the real
+                    // process exit code to set COMPLETED/FAILED instead of guessing.
+                    if (rawEvent && typeof rawEvent === 'object' && '__exit_code__' in rawEvent) {
+                        const exitCode = rawEvent.__exit_code__;
+                        if (exitCode === 0) {
+                            this.status = AgentStatus.COMPLETED;
+                        }
+                        else {
+                            this.status = AgentStatus.FAILED;
+                        }
+                        this.completedAt = new Date(fallbackTimestamp);
+                        continue;
+                    }
                     const events = normalizeEvents(this.agentType, rawEvent);
                     const resolvedTimestamp = extractTimestamp(rawEvent)?.toISOString() || fallbackTimestamp;
                     for (const event of events) {
