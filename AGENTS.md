@@ -71,6 +71,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/autonomous-operations.md
 - After each task, briefly assess whether avoidable mistakes occurred. In direct mode, propose rule updates if warranted. In delegated mode, include improvement suggestions in the task result.
 - If you state a persistent workflow change (e.g., `from now on`, `I'll always`), immediately propose the corresponding rule update and request approval in the same task; do not leave it as an unrecorded promise. When operating under a multi-agent-delegation model, follow that rule module's guidance on restricted operations before proposing changes.
 - Because session memory resets between tasks, treat rule files as persistent memory; when any issue or avoidable mistake occurs, update rules in the same task to prevent recurrence.
+- Never apply rules from memory of previous sessions; always reference the current AGENTS.md. If unsure whether a rule still applies, re-read it.
 - Treat these rules as the source of truth; do not override them with repository conventions. If a repo conflicts, update the repo to comply or update the rules to encode the exception; do not make undocumented exceptions.
 
 ## Skill role persistence
@@ -370,6 +371,19 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/release-and-publication.m
 - Keep package version and Git tag consistent.
 - Run dependency security checks before release.
 - Verify published packages resolve and run correctly before reporting done.
+
+## Delivery chain gate
+
+Before reporting a code change as complete in a publishable package, verify the full delivery chain. Each step that applies must be done; do not stop mid-chain.
+
+1. Committed
+2. Pushed
+3. Version bumped (if publishable change)
+4. GitHub Release created
+5. Package published to registry
+6. Global/local install updated and verified
+
+If you discover you stopped mid-chain, resume from where you left off immediately — do not wait for the user to point it out.
 
 Source: github:metyatech/agent-rules@HEAD/rules/global/skill-authoring.md
 
