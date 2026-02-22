@@ -6,12 +6,7 @@ import { describe, test, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { tmpdir } from "os";
-import {
-  getTaskAgents,
-  runStatusCommand,
-  runWaitCommand,
-  parseCliArgs
-} from "../src/cli.js";
+import { getTaskAgents, runStatusCommand, runWaitCommand, parseCliArgs } from "../src/cli.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -48,7 +43,10 @@ describe("getTaskAgents", () => {
   let agentsDir: string;
 
   beforeEach(async () => {
-    agentsDir = path.join(tmpdir(), `cli_test_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+    agentsDir = path.join(
+      tmpdir(),
+      `cli_test_${Date.now()}_${Math.random().toString(36).slice(2)}`
+    );
     await fs.mkdir(agentsDir, { recursive: true });
   });
 
@@ -68,9 +66,21 @@ describe("getTaskAgents", () => {
   });
 
   test("returns only agents matching the task name", async () => {
-    await writeMetaJson(agentsDir, "agent-a", makeMeta({ agent_id: "agent-a", task_name: "task-A" }));
-    await writeMetaJson(agentsDir, "agent-b", makeMeta({ agent_id: "agent-b", task_name: "task-B" }));
-    await writeMetaJson(agentsDir, "agent-c", makeMeta({ agent_id: "agent-c", task_name: "task-A" }));
+    await writeMetaJson(
+      agentsDir,
+      "agent-a",
+      makeMeta({ agent_id: "agent-a", task_name: "task-A" })
+    );
+    await writeMetaJson(
+      agentsDir,
+      "agent-b",
+      makeMeta({ agent_id: "agent-b", task_name: "task-B" })
+    );
+    await writeMetaJson(
+      agentsDir,
+      "agent-c",
+      makeMeta({ agent_id: "agent-c", task_name: "task-A" })
+    );
 
     const result = await getTaskAgents("task-A", agentsDir);
     expect(result).toHaveLength(2);
@@ -183,7 +193,11 @@ describe("getTaskAgents", () => {
   test("skips entries that are not directories", async () => {
     // Create a plain file (not a directory) at the top level of agentsDir
     await fs.writeFile(path.join(agentsDir, "not-a-dir.txt"), "junk");
-    await writeMetaJson(agentsDir, "real-agent", makeMeta({ agent_id: "real-agent", task_name: "skip-task" }));
+    await writeMetaJson(
+      agentsDir,
+      "real-agent",
+      makeMeta({ agent_id: "real-agent", task_name: "skip-task" })
+    );
 
     const result = await getTaskAgents("skip-task", agentsDir);
     expect(result).toHaveLength(1);
@@ -193,7 +207,11 @@ describe("getTaskAgents", () => {
   test("skips agent directories with missing meta.json", async () => {
     // Directory with no meta.json
     await fs.mkdir(path.join(agentsDir, "no-meta"), { recursive: true });
-    await writeMetaJson(agentsDir, "good-agent", makeMeta({ agent_id: "good-agent", task_name: "meta-task" }));
+    await writeMetaJson(
+      agentsDir,
+      "good-agent",
+      makeMeta({ agent_id: "good-agent", task_name: "meta-task" })
+    );
 
     const result = await getTaskAgents("meta-task", agentsDir);
     expect(result).toHaveLength(1);
@@ -204,7 +222,11 @@ describe("getTaskAgents", () => {
     const badDir = path.join(agentsDir, "bad-json-agent");
     await fs.mkdir(badDir, { recursive: true });
     await fs.writeFile(path.join(badDir, "meta.json"), "{ not valid json", "utf-8");
-    await writeMetaJson(agentsDir, "good-agent2", makeMeta({ agent_id: "good-agent2", task_name: "bad-task" }));
+    await writeMetaJson(
+      agentsDir,
+      "good-agent2",
+      makeMeta({ agent_id: "good-agent2", task_name: "bad-task" })
+    );
 
     const result = await getTaskAgents("bad-task", agentsDir);
     expect(result).toHaveLength(1);
@@ -236,11 +258,43 @@ describe("runStatusCommand", () => {
   });
 
   test("returns correct summary counts for mixed-status agents", async () => {
-    await writeMetaJson(agentsDir, "a1", makeMeta({ agent_id: "a1", task_name: "count-task", status: "running", pid: process.pid, completed_at: null }));
-    await writeMetaJson(agentsDir, "a2", makeMeta({ agent_id: "a2", task_name: "count-task", status: "completed" }));
-    await writeMetaJson(agentsDir, "a3", makeMeta({ agent_id: "a3", task_name: "count-task", status: "failed" }));
-    await writeMetaJson(agentsDir, "a4", makeMeta({ agent_id: "a4", task_name: "count-task", status: "stopped" }));
-    await writeMetaJson(agentsDir, "a5", makeMeta({ agent_id: "a5", task_name: "other-task", status: "running", pid: process.pid, completed_at: null }));
+    await writeMetaJson(
+      agentsDir,
+      "a1",
+      makeMeta({
+        agent_id: "a1",
+        task_name: "count-task",
+        status: "running",
+        pid: process.pid,
+        completed_at: null
+      })
+    );
+    await writeMetaJson(
+      agentsDir,
+      "a2",
+      makeMeta({ agent_id: "a2", task_name: "count-task", status: "completed" })
+    );
+    await writeMetaJson(
+      agentsDir,
+      "a3",
+      makeMeta({ agent_id: "a3", task_name: "count-task", status: "failed" })
+    );
+    await writeMetaJson(
+      agentsDir,
+      "a4",
+      makeMeta({ agent_id: "a4", task_name: "count-task", status: "stopped" })
+    );
+    await writeMetaJson(
+      agentsDir,
+      "a5",
+      makeMeta({
+        agent_id: "a5",
+        task_name: "other-task",
+        status: "running",
+        pid: process.pid,
+        completed_at: null
+      })
+    );
 
     const result = await runStatusCommand("count-task", agentsDir);
 
@@ -280,7 +334,11 @@ describe("runWaitCommand", () => {
   });
 
   test("returns immediately when all agents are already completed", async () => {
-    await writeMetaJson(agentsDir, "done-agent", makeMeta({ agent_id: "done-agent", task_name: "done-task", status: "completed" }));
+    await writeMetaJson(
+      agentsDir,
+      "done-agent",
+      makeMeta({ agent_id: "done-agent", task_name: "done-task", status: "completed" })
+    );
 
     const before = Date.now();
     const result = await runWaitCommand("done-task", 5000, agentsDir);
@@ -297,7 +355,13 @@ describe("runWaitCommand", () => {
     await writeMetaJson(
       agentsDir,
       "stuck-agent",
-      makeMeta({ agent_id: "stuck-agent", task_name: "stuck-task", status: "running", pid: process.pid, completed_at: null })
+      makeMeta({
+        agent_id: "stuck-agent",
+        task_name: "stuck-task",
+        status: "running",
+        pid: process.pid,
+        completed_at: null
+      })
     );
 
     // timeout=50ms means deadline expires well before the 1000ms poll interval,
@@ -348,14 +412,30 @@ describe("parseCliArgs", () => {
   });
 
   test("parses wait subcommand with --task and --timeout", () => {
-    const result = parseCliArgs(["node", "cli.js", "wait", "--task", "my-task", "--timeout", "10000"]);
+    const result = parseCliArgs([
+      "node",
+      "cli.js",
+      "wait",
+      "--task",
+      "my-task",
+      "--timeout",
+      "10000"
+    ]);
     expect(result.subcommand).toBe("wait");
     expect(result.taskName).toBe("my-task");
     expect(result.timeout).toBe(10000);
   });
 
   test("clamps timeout to max 600000ms", () => {
-    const result = parseCliArgs(["node", "cli.js", "wait", "--task", "t", "--timeout", "999999999"]);
+    const result = parseCliArgs([
+      "node",
+      "cli.js",
+      "wait",
+      "--task",
+      "t",
+      "--timeout",
+      "999999999"
+    ]);
     expect(result.timeout).toBe(600_000);
   });
 
@@ -398,7 +478,15 @@ describe("parseCliArgs", () => {
   });
 
   test("ignores invalid --timeout values", () => {
-    const result = parseCliArgs(["node", "cli.js", "wait", "--task", "t", "--timeout", "notanumber"]);
+    const result = parseCliArgs([
+      "node",
+      "cli.js",
+      "wait",
+      "--task",
+      "t",
+      "--timeout",
+      "notanumber"
+    ]);
     // Should fall back to default
     expect(result.timeout).toBe(300_000);
   });

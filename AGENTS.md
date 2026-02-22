@@ -339,7 +339,8 @@ For AC definition, verification evidence, regression tests, and final reporting 
 - Enforce via CI: run the full suite on pull requests and on pushes to the default branch, and make it a required status check for merges; if no CI harness exists, add one using repo-standard commands.
 - Configure required status checks on the default branch when you have permission; otherwise report the limitation.
 - Do not rely on smoke-only gating or scheduled-only full runs for correctness; merges must require the full suite.
-- Ensure commit-time automation (pre-commit or repo-native) runs the full suite and blocks commits.
+- Ensure commit-time automation (pre-commit or repo-native) runs the full suite and blocks commits. This is a hard prerequisite: before making the first commit in a repository during a session, verify that pre-commit hooks are installed and functional; if not, install them before any other commits.
+- If pre-commit hooks cannot be installed (environment restriction, no supported tool), manually run the repo's full verify command before every commit and confirm it passes; do not proceed to `git commit` until verify succeeds.
 - Never disable checks, weaken assertions, loosen types, or add retries solely to make checks pass.
 - If the execution environment restricts test execution (no network, no database, sandboxed), run the available subset, document what was skipped, and ensure CI covers the remainder.
 

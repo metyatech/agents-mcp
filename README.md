@@ -221,10 +221,10 @@ Instant, non-blocking status check. Reads agent metadata directly from `~/.agent
 agents-mcp status --task <name>
 ```
 
-| Option | Required | Description |
-| ------ | -------- | ----------- |
-| `--task <name>` | Yes | Task name to check |
-| `--help` | No | Show help |
+| Option          | Required | Description        |
+| --------------- | -------- | ------------------ |
+| `--task <name>` | Yes      | Task name to check |
+| `--help`        | No       | Show help          |
 
 **Output:** JSON summary of all agents in the task (status, files changed, last messages).
 
@@ -236,19 +236,19 @@ Polls until all agents in the task complete or a timeout is reached.
 agents-mcp wait --task <name> [--timeout <ms>]
 ```
 
-| Option | Required | Description |
-| ------ | -------- | ----------- |
-| `--task <name>` | Yes | Task name to wait on |
-| `--timeout <ms>` | No | Maximum wait time in milliseconds (default: 300000, max: 600000) |
-| `--help` | No | Show help |
+| Option           | Required | Description                                                      |
+| ---------------- | -------- | ---------------------------------------------------------------- |
+| `--task <name>`  | Yes      | Task name to wait on                                             |
+| `--timeout <ms>` | No       | Maximum wait time in milliseconds (default: 300000, max: 600000) |
+| `--help`         | No       | Show help                                                        |
 
 ### Exit codes
 
-| Code | Meaning |
-| ---- | ------- |
-| `0` | All agents completed successfully |
-| `1` | Timeout or error |
-| `2` | No agents found for the task |
+| Code | Meaning                           |
+| ---- | --------------------------------- |
+| `0`  | All agents completed successfully |
+| `1`  | Timeout or error                  |
+| `2`  | No agents found for the task      |
 
 ### Non-blocking monitoring pattern
 

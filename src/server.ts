@@ -391,7 +391,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
  * notifications when agents transition from running to completed/failed/stopped.
  * Returns the interval handle so callers can clear it on shutdown.
  */
-export async function startAgentMonitor(monitorServer: Server, agentsDir: string): Promise<NodeJS.Timeout> {
+export async function startAgentMonitor(
+  monitorServer: Server,
+  agentsDir: string
+): Promise<NodeJS.Timeout> {
   // Pre-populate known statuses so we don't fire false positives for
   // agents that were already completed before the server started.
   const knownStatuses = new Map<string, string>();
