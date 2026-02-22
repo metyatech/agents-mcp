@@ -61,9 +61,7 @@ MODE PARAMETER (required for writes):
 
 RALPH MODE: Spawns ONE agent with full permissions and instructions to work through RALPH.md. The agent reads the task file, understands the system, picks tasks logically, completes them, marks checkboxes, and continues until all tasks are checked. The orchestrator can spawn multiple ralph agents in parallel for different directories/task files.
 
-WAIT BEFORE CHECKING STATUS: After spawning all agents for this task, sleep for at least 2 minutes before checking status. Use: Bash(sleep 120 && echo "Done waiting on Swarm agents. Let's check status") timeout: 2m 30s
-
-Do NOT immediately call Status - it wastes tokens and returns nothing useful.
+WAIT FOR COMPLETION: After spawning agents, use Status(task_name, wait=true, timeout=300000) to block until all agents complete. Do NOT use sleep to wait — Status with wait=true is more efficient and returns results immediately when agents finish.
 
 Agent selection (in order of preference):
 ${agentList}
