@@ -1,5 +1,6 @@
 <!-- markdownlint-disable MD025 -->
 # Tool Rules (compose-agentsmd)
+
 - Before starting any work, run `compose-agentsmd` from the project root.
 - `compose-agentsmd` intentionally regenerates `AGENTS.md`; any resulting `AGENTS.md` diff is expected and must not be treated as an unexpected external change.
 - If `compose-agentsmd` is not available, install it via npm: `npm install -g compose-agentsmd`.
@@ -46,6 +47,17 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/agent-rules-composition.m
 - Only use domain rules when the rule is strictly relevant inside repositories that opt in to that domain.
 - Before choosing domain, verify: "Will this rule ever be needed when working from a workspace that does not include this domain?" If yes, make it global.
 
+## Rules vs skills
+
+Rules and skills serve different purposes. Choose the right mechanism based on what happens when the guidance is absent.
+
+- **Global rules**: Invariants and constraints that must always hold. Violation causes breakage, incorrect behavior, or safety issues. Always loaded into context, so keep them concise. Examples: approval gates, quality standards, coding constraints, identity policies.
+- **Domain rules**: Ecosystem-specific standards needed only in repositories that opt in. Violation causes quality degradation within that ecosystem. Examples: Node ESM conventions, npm package publishing standards.
+- **Skills**: Procedures, checklists, and workflows loaded on demand. Missing a skill causes inefficiency or inconsistency, but nothing breaks. Skills may be detailed and lengthy because they are only loaded when triggered. Examples: release workflow, CLI design checklist, per-language toolchain setup, PR review procedure.
+- **Local rules**: Repository-specific overrides or exceptions to global/domain rules.
+
+When a rule file grows with procedural/checklist content, extract the procedures into a skill and keep only the invariant constraints in the rule.
+
 Source: github:metyatech/agent-rules@HEAD/rules/global/autonomous-operations.md
 
 # Autonomous operations
@@ -76,15 +88,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/cli-standards.md
 
 # CLI standards
 
-- Provide --help/-h with clear usage, options, and examples; include required parameters in examples.
-- Provide --version (use -V); reserve -v for --verbose.
-- Support stdin/stdout piping; allow output redirection (e.g., --output for file creation).
-- Offer machine-readable output (e.g., --json) when emitting structured data.
-- For modifying/deleting actions, provide --dry-run and an explicit bypass (--yes/--force).
-- Provide controllable logging (--quiet, --verbose, or --trace).
-- Use deterministic exit codes (0 success, non-zero failure) and avoid silent fallbacks.
-- For JSON configuration, define/update a JSON Schema and validate config on load.
-- For interactive CLI prompts, provide required context before asking; for yes/no prompts, Enter means "Yes" and "n" means "No".
+- When building a CLI, follow standard conventions: --help/-h, --version/-V, stdin/stdout piping, --json output, --dry-run for mutations, deterministic exit codes, and JSON Schema config validation.
 
 Source: github:metyatech/agent-rules@HEAD/rules/global/command-execution.md
 
@@ -97,19 +101,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/command-execution.md
 - If elevated privileges are required, use sudo where available; otherwise run as Administrator.
 - Keep changes scoped to affected repositories; when shared modules change, update consumers and verify at least one.
 - If no branch is specified, work on the current branch; direct commits to main/master are allowed.
-- After addressing PR review feedback, resolve the corresponding review thread(s) before concluding; if you lack permission, state it explicitly.
-- Before re-requesting review after addressing feedback, run the relevant verification suite and summarize results (commands + outcomes) in the PR comment/description.
-- After pushing fixes for PR review feedback, re-request review only from reviewer(s) who posted the addressed feedback in the current round.
-- Do not re-request review from reviewers (including AI reviewers) who did not post addressed feedback, or who already indicated no actionable issues.
-- If no applicable reviewer remains, ask who should review next.
-- When Codex and/or Copilot review bots are configured for the repo, trigger re-review only for the bot(s) that posted addressed feedback.
-- For Codex re-review (only when applicable): comment `@codex review` on the PR.
-- For Copilot re-review (only when applicable): use `gh api` to remove+re-request the bot reviewer `copilot-pull-request-reviewer[bot]` (do not rely on `gh pr edit --add-reviewer Copilot`).
-  - Remove: `gh api --method DELETE /repos/{owner}/{repo}/pulls/{pr}/requested_reviewers -f "reviewers[]=copilot-pull-request-reviewer[bot]"`
-  - Add: `gh api --method POST /repos/{owner}/{repo}/pulls/{pr}/requested_reviewers -f "reviewers[]=copilot-pull-request-reviewer[bot]"`
-- After completing a PR, merge it, sync the target branch, and delete the PR branch locally and remotely.
-- Agent platforms have different execution capabilities (sandboxing, network access, push permissions). Do not assume capabilities beyond what the current platform provides; fail explicitly when a required capability is unavailable.
-- When handling GitHub notifications, use `DELETE /notifications/threads/{id}` (HTTP 204) to mark them as **done** (removes from inbox/moves to Done tab). Do NOT use `PATCH /notifications/threads/{id}` (marks as read but leaves in inbox). After processing notifications, bulk-delete any remaining read-but-not-done notifications with the same DELETE API.
+- Do not assume agent platform capabilities beyond what is available; fail explicitly when unavailable.
 
 Source: github:metyatech/agent-rules@HEAD/rules/global/delivery-hard-gates.md
 
@@ -181,116 +173,14 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/linting-formatting-and-st
 
 # Linters, formatters, and static analysis
 
-## General policy
-
 - Every code repo must have a formatter and a linter/static analyzer for its primary languages.
-- Prefer one formatter and one linter per language; avoid overlapping tools that fight each other.
-- Follow the standard toolchains below. If a repo conflicts, migrate it to comply unless the user explicitly restricts scope.
-- If you believe an exception is needed, encode it as a rule update and regenerate AGENTS.md before proceeding.
+- Prefer one formatter and one linter per language; avoid overlapping tools.
 - Enforce in CI: run formatting checks (verify-no-changes) and linting on pull requests and require them for merges.
-- Treat warnings as errors in CI; when a tool cannot, use its strictest available setting so warnings fail CI.
+- Treat warnings as errors in CI.
 - Do not disable rules globally; keep suppressions narrow, justified, and time-bounded.
 - Pin tool versions (lockfiles/manifests) for reproducible CI.
-
-## Design and visual accessibility automation
-
-- Apply this section to projects with web UI components only.
-- For any design/UI styling change in any project, enforce automated visual accessibility checks as part of the repo-standard `verify` command and CI.
-- Do not rely on per-page/manual test maintenance; use route discovery (for example sitemap, generated route lists, or framework route manifests) so newly added pages are automatically included.
-- Validate both light and dark themes when theme switching is supported.
-- Validate at least default, hover, and focus states for interactive elements.
-- Enforce non-text boundary contrast checks across all visible UI elements that present boundaries (including interactive controls and container-like elements), not only predefined component classes.
-- Do not hardcode a narrow selector allowlist for boundary checks; use broad DOM discovery with only minimal technical exclusions (for example hidden/zero-size/non-rendered nodes).
-- Fail CI on violations; do not silently ignore design regressions.
-- If temporary exclusions are unavoidable, keep them narrowly scoped, documented with rationale, and remove them promptly.
-
-## Security baseline
-
-- Require dependency vulnerability scanning appropriate to the ecosystem (SCA) for merges. If you cannot enable it, report the limitation and get explicit user approval before proceeding without it.
-- Enable GitHub secret scanning and remediate findings; never commit secrets. If it is unavailable, add a repo-local secret scanner and require it for merges.
-- Enable CodeQL code scanning for supported languages. If it cannot be enabled, report the limitation and use the best available alternative for that ecosystem.
-
-## Default toolchain by language
-
-### JavaScript / TypeScript (incl. React/Next)
-
-- Format+lint: ESLint + Prettier.
-- When configuring Prettier, always add and maintain `.prettierignore` so generated/build outputs and composed files are not formatted/linted as source (e.g., `dist/`, build artifacts, and `AGENTS.md` when generated by compose-agentsmd).
-- Typecheck: `tsc` with strict settings for TS projects.
-- Dependency scan: `osv-scanner`. If unsupported, use the package manager's audit tooling.
-
-### Python
-
-- Format+lint: Ruff.
-- Typecheck: Pyright.
-- Dependency scan: pip-audit.
-
-### Go
-
-- Format: gofmt.
-- Lint/static analysis: golangci-lint (includes staticcheck).
-- Dependency scan: govulncheck.
-
-### Rust
-
-- Format: cargo fmt.
-- Lint/static analysis: cargo clippy with warnings as errors.
-- Dependency scan: cargo audit.
-
-### Java
-
-- Format: Spotless + google-java-format.
-- Lint/static analysis: Checkstyle + SpotBugs.
-- Dependency scan: OWASP Dependency-Check.
-
-### Kotlin
-
-- Format: Spotless + ktlint.
-- Lint/static analysis: detekt.
-- Compiler: enable warnings-as-errors in CI; if impractical, get explicit user approval before relaxing.
-
-### C#
-
-- Format: dotnet format (verify-no-changes in CI).
-- Lint/static analysis: enable .NET analyzers; treat warnings as errors; enable nullable reference types.
-- Dependency scan: `dotnet list package --vulnerable`.
-
-### C++
-
-- Format: clang-format.
-- Lint/static analysis: clang-tidy.
-- Build: enable strong warnings and treat as errors; run sanitizers (ASan/UBSan) in CI where supported.
-
-### PowerShell
-
-- Format+lint: PSScriptAnalyzer (Invoke-Formatter + Invoke-ScriptAnalyzer).
-- Runtime: Set-StrictMode -Version Latest; fail fast on errors.
-- Tests: Pester when tests exist.
-- Enforce PSScriptAnalyzer via the repo's standard `verify` command/script when PowerShell is used; treat findings as errors.
-
-### Shell (sh/bash)
-
-- Format: shfmt.
-- Lint: shellcheck.
-
-### Dockerfile
-
-- Lint: hadolint.
-
-### Terraform
-
-- Format: terraform fmt -check.
-- Validate: terraform validate.
-- Lint: tflint.
-- Security scan: trivy config.
-
-### YAML
-
-- Lint: yamllint.
-
-### Markdown
-
-- Lint: markdownlint.
+- For web UI projects, enforce automated visual accessibility checks in CI.
+- Require dependency vulnerability scanning, secret scanning, and CodeQL for supported languages.
 
 Source: github:metyatech/agent-rules@HEAD/rules/global/multi-agent-delegation.md
 
@@ -402,6 +292,36 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/planning-and-approval-gat
 - If state-changing execution starts without the required post-plan "yes", stop immediately, report the gate miss, add/update a prevention rule, regenerate AGENTS.md, and then restart from the approval gate.
 - No other exceptions: even if the user requests immediate execution (e.g., "skip planning", "just do it"), treat that as a request to move quickly through this gate, not to bypass it.
 
+## Scope-based blanket approval
+
+- When the user gives a broad directive that clearly encompasses multiple steps (e.g., "fix everything", "do all of these"), treat it as approval for all work within that scope; do not re-request approval for individual sub-steps, batches, or obviously implied follow-up actions.
+- Obviously implied follow-up includes: rebuild linked packages, restart local services, update global installs, and other post-change deployment steps covered by existing rules.
+- Re-request approval only when expanding beyond the original scope or when an action carries risk not covered by the original directive.
+
+Source: github:metyatech/agent-rules@HEAD/rules/global/post-change-deployment.md
+
+# Post-change deployment
+
+After modifying code in a repository, check whether the changes require
+deployment steps beyond commit/push before concluding.
+
+## Globally linked packages
+
+- If the repository is globally installed via `npm link` (identifiable by
+  `npm ls -g --depth=0` showing `->` pointing to a local path), run the
+  repo's build command after code changes so the global binary reflects
+  the update.
+- Verify the rebuilt output is functional (e.g., run the CLI's `--version`
+  or a smoke command).
+
+## Locally running services and scheduled tasks
+
+- If the repository powers a locally running service, daemon, or scheduled
+  task, rebuild and restart the affected component after code changes.
+- Verify the restart with deterministic evidence (new PID, port check,
+  service status query, or log entry showing updated behavior).
+- Do not claim completion until the running instance reflects the changes.
+
 Source: github:metyatech/agent-rules@HEAD/rules/global/quality-testing-and-errors.md
 
 # Quality, testing, and error handling
@@ -422,25 +342,11 @@ For AC definition, verification evidence, regression tests, and final reporting 
 - Never disable checks, weaken assertions, loosen types, or add retries solely to make checks pass.
 - If the execution environment restricts test execution (no network, no database, sandboxed), run the available subset, document what was skipped, and ensure CI covers the remainder.
 
-## Tests (behavior changes)
+## Tests
 
 - Follow test-first: add/update tests, observe failure, implement the fix, then observe pass.
-- Cover success, failure, boundary, invalid input, and key state transitions (including first-run/cold-start vs subsequent-run behavior when relevant); include representative concurrency/retry/recovery when relevant.
 - Keep tests deterministic; minimize time/random/external I/O; inject when needed.
-- For deterministic output files, use full-content snapshot/golden tests.
-- Prefer making nondeterministic failures reproducible over adding sleeps/retries; do not mask flakiness.
-- For timing/order/race issues, prefer deterministic synchronization (events, versioned state, acks/handshakes) over fixed sleeps.
 - If a heuristic wait is unavoidable, it MUST be condition-based with a hard deadline and diagnostics, and requires explicit requester approval.
-- For integration boundaries (network/DB/external services/UI flows), add an integration/E2E/contract test that exercises the boundary; avoid unit-only coverage for integration bugs.
-- For non-trivial changes, create a small test matrix (scenarios × inputs × states) and cover the highest-risk combinations; document intentional gaps.
-
-## Feedback loops and root causes
-
-- Treat time-to-detect and time-to-fix as quality attributes; shorten the feedback loop with automation and observability rather than relying on manual QA.
-- For any defect fix or incident remediation, perform a brief root-cause classification: implementation mistake, design deficit, and/or ambiguous/incorrect requirements.
-- Feed the root cause upstream in the same change set: add or tighten tests/checks/alerts, update specs/acceptance criteria, and update design docs/ADRs when applicable.
-- If the failure should have been detected earlier, add a gate at the earliest reliable point (lint/typecheck/tests/CI required checks or runtime alerts/health checks); skipping this requires explicit user approval.
-- Record the prevention mechanism (what will catch it next time) in the PR description or issue comment; avoid "fixed" without a concrete feedback-loop improvement.
 
 ## Exceptions
 
@@ -458,44 +364,12 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/release-and-publication.m
 
 # Release and publication
 
-## Packaging and distribution
-
 - Include LICENSE in published artifacts (copyright holder: metyatech).
 - Do not ship build/test artifacts or local configs; ensure a clean environment can use the product via README steps.
 - Define a SemVer policy and document what counts as a breaking change.
-
-## Public repository metadata
-
-- For public repos, set GitHub Description, Topics, and Homepage.
-- Ensure required repo files exist: .github/workflows/ci.yml, issue templates, PR template, SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, CHANGELOG.md.
-- Configure CI to run the repo's standard lint/test/build commands.
-
-## Versioning and release flow
-
-- Update version metadata when release content changes; keep package version and Git tag consistent.
-- Create and push a release tag; create a GitHub Release based on CHANGELOG.
-- If asked to choose a version, decide it yourself.
-- When bumping a version, create the GitHub Release and publish the package in the same update.
-- For npm publishing, ask the user to run npm publish (do not execute it directly).
-- Before publishing, run required prep commands (e.g., npm install, npm test, npm pack --dry-run) and only proceed when ready.
-- If authentication fails during publish, ask the user to complete the publish step.
-- Run dependency security checks before release, address critical issues, and report results.
-- After publishing, update any locally installed copy to the newly published release and verify the resolved version.
-  - Completion gate: do not report “done” until this verification is completed (or the user explicitly declines).
-  - Must be expressed as explicit Acceptance Criteria and reported with outcomes (PASS/FAIL/N/A) + evidence in the final report:
-    - AC1 (registry): verify the published version exists in the registry (e.g., `npm view <pkg> version`).
-    - AC2 (fresh install): verify the latest package resolves and runs (e.g., `npx <pkg>@latest --version`).
-    - AC3 (global update, if applicable): if the package is installed globally, update it to the published version and verify (e.g., `npm ls -g <pkg> --depth=0`, `npm i -g <pkg>@latest`, then `<cmd> --version`).
-    - If AC3 is not applicable (not installed globally) or cannot be performed, mark it N/A and state the reason explicitly.
-  - For npm CLIs:
-    - If installed globally: check `npm ls -g <pkg> --depth=0`, update via `npm i -g <pkg>@latest` (or the published dist-tag), then verify with `<pkg> --version`.
-    - If not installed globally: skip the global update, and verify availability via `npx <pkg>@latest --version` (or the ecosystem-equivalent).
-
-## Published artifact requirements
-
-- Populate package metadata (name, description, repository, issues, homepage, engines).
-- Validate executable entrypoints and required shebangs so installed commands work.
-- If a repo represents a single tool/product, publish a single package (bundle related scripts).
+- Keep package version and Git tag consistent.
+- Run dependency security checks before release.
+- Verify published packages resolve and run correctly before reporting done.
 
 Source: github:metyatech/agent-rules@HEAD/rules/global/skill-authoring.md
 
@@ -522,8 +396,9 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/skill-authoring.md
 - Each skill lives in its own repository.
 - Use clear, descriptive repository names (e.g., `skill-manager`).
 - Keep SKILL.md at the repository root for `npx skills add` compatibility.
-- Install and manage skills via `npx skills add <owner>/<repo>` (vercel-labs/skills);
-  do not build custom installers.
+- Install and manage skills via `npx skills add <owner>/<repo> --yes --global`
+  (vercel-labs/skills); always use `--yes --global` to install globally without
+  interactive prompts. Do not build custom installers.
 
 ## Publishing
 
@@ -539,6 +414,15 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/skill-authoring.md
 - Keep instructions concise, action-oriented, and testable.
 - Do not duplicate rules already covered by AGENTS.md global rules
   (e.g., TDD, verification, planning gates); reference them instead.
+
+Source: github:metyatech/agent-rules@HEAD/rules/global/task-lifecycle-tracking.md
+
+# Task lifecycle tracking
+
+- When an actionable task emerges during a session, immediately record it with `task-tracker add` so it persists on disk regardless of session termination.
+- At the start of any session that may involve state-changing work, run `task-tracker check` and report findings before starting new work.
+- When reporting a task as complete, state the lifecycle stage explicitly (committed/pushed/released/etc.); never claim "done" when downstream stages remain incomplete.
+- If `task-tracker` is not installed, install it via `npm install -g @metyatech/task-tracker` before proceeding.
 
 Source: github:metyatech/agent-rules@HEAD/rules/global/user-identity-and-accounts.md
 
