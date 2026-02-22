@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "agents-mcp": "dist/index.js"
+    "agents-mcp": "./dist/cli.js"
   },
   "files": [
     "dist"

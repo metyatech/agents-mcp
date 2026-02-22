@@ -1,9 +1,11 @@
+import * as fs from "fs/promises";
+import * as path from "path";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, InitializeRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { AgentManager, checkAllClis } from "./agents.js";
 import { handleSpawn, handleStatus, handleStop, handleTasks, handleReply } from "./api.js";
-import { readConfig } from "./persistence.js";
+import { readConfig, resolveAgentsDir } from "./persistence.js";
 import { buildVersionNotice, detectClientFromName, getCurrentVersion, initVersionCheck, setDetectedClient } from "./version.js";
 let agentConfigs = null;
 const manager = new AgentManager(50, 10, null, null, null, 7, agentConfigs);
@@ -66,14 +68,20 @@ WAIT FOR COMPLETION: After spawning agents, use Status(task_name, wait=true, tim
 Agent selection (in order of preference):
 ${agentList}
 
-Choose automatically based on task requirements - don't ask the user.`;
+Choose automatically based on task requirements - don't ask the user.
+
+NON-BLOCKING MONITORING: After spawning, choose a monitoring strategy:
+- Claude Code: Use Bash(run_in_background=true, command="agents-mcp wait --task <name>") for background monitoring while staying responsive to user input.
+- All platforms: Use Status(wait=false) for instant, non-blocking status checks. Avoid Status(wait=true) if you need to remain responsive to user input during the wait.
+- MCP logging notifications are sent automatically when agents complete (platforms that support MCP logging will receive these).`;
 }
 const server = new Server({
     name: "Swarm",
     version: getCurrentVersion()
 }, {
     capabilities: {
-        tools: {}
+        tools: {},
+        logging: {}
     }
 });
 // Capture client info for version warnings
@@ -86,7 +94,8 @@ server.setRequestHandler(InitializeRequestSchema, async (request) => {
     return {
         protocolVersion: "2024-11-05",
         capabilities: {
-            tools: {}
+            tools: {},
+            logging: {}
         },
         serverInfo: {
             name: "Swarm",
@@ -146,7 +155,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 
 Use this for polling agent progress.
 
-CURSOR SUPPORT: Send 'since' parameter (ISO timestamp from previous response's 'cursor' field) to get only NEW data since that time. This avoids duplicate data on repeated polls.`),
+CURSOR SUPPORT: Send 'since' parameter (ISO timestamp from previous response's 'cursor' field) to get only NEW data since that time. This avoids duplicate data on repeated polls.
+
+BLOCKING vs NON-BLOCKING: When wait=true, this tool blocks until agents complete or timeout. During this time, the orchestrating agent cannot receive new instructions from the user. Use wait=false for non-blocking checks, or use the \`agents-mcp wait\` CLI command via background bash for non-blocking monitoring.`),
                 inputSchema: {
                     type: "object",
                     properties: {
@@ -320,6 +331,88 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
     }
 });
+/**
+ * Background monitor that watches agent meta.json files and sends MCP logging
+ * notifications when agents transition from running to completed/failed/stopped.
+ * Returns the interval handle so callers can clear it on shutdown.
+ */
+export async function startAgentMonitor(monitorServer, agentsDir) {
+    // Pre-populate known statuses so we don't fire false positives for
+    // agents that were already completed before the server started.
+    const knownStatuses = new Map();
+    try {
+        const entries = await fs.readdir(agentsDir).catch(() => []);
+        for (const entry of entries) {
+            const metaPath = path.join(agentsDir, entry, "meta.json");
+            try {
+                const content = await fs.readFile(metaPath, "utf-8");
+                const meta = JSON.parse(content);
+                if (typeof meta.agent_id === "string" && typeof meta.status === "string") {
+                    knownStatuses.set(meta.agent_id, meta.status);
+                }
+            }
+            catch {
+                // skip malformed or missing meta files
+            }
+        }
+    }
+    catch {
+        // ignore initialization errors
+    }
+    const interval = setInterval(async () => {
+        try {
+            const entries = await fs.readdir(agentsDir).catch(() => []);
+            for (const entry of entries) {
+                const metaPath = path.join(agentsDir, entry, "meta.json");
+                let meta;
+                try {
+                    const content = await fs.readFile(metaPath, "utf-8");
+                    meta = JSON.parse(content);
+                }
+                catch {
+                    continue;
+                }
+                const agentId = meta.agent_id;
+                const status = meta.status;
+                if (typeof agentId !== "string" || typeof status !== "string")
+                    continue;
+                const prevStatus = knownStatuses.get(agentId);
+                knownStatuses.set(agentId, status);
+                // Only notify on running → non-running transitions
+                if (prevStatus === "running" && status !== "running") {
+                    const startedAt = typeof meta.started_at === "string" ? meta.started_at : null;
+                    const completedAt = typeof meta.completed_at === "string" ? meta.completed_at : null;
+                    const startMs = startedAt ? new Date(startedAt).getTime() : 0;
+                    const endMs = completedAt ? new Date(completedAt).getTime() : Date.now();
+                    try {
+                        await monitorServer.sendLoggingMessage({
+                            level: "info",
+                            logger: "agents",
+                            data: {
+                                type: "agent_completed",
+                                task_name: typeof meta.task_name === "string" ? meta.task_name : null,
+                                agent_id: agentId,
+                                agent_type: typeof meta.agent_type === "string" ? meta.agent_type : null,
+                                status,
+                                duration_ms: endMs > startMs ? endMs - startMs : 0,
+                                completed_at: completedAt ?? new Date().toISOString()
+                            }
+                        });
+                    }
+                    catch {
+                        // Client may not support logging notifications — ignore silently
+                    }
+                }
+            }
+        }
+        catch {
+            // Ignore monitor errors to avoid crashing the server
+        }
+    }, 2500);
+    // Don't keep the process alive just for the monitor
+    interval.unref();
+    return interval;
+}
 export async function runServer() {
     // Load config
     const config = await readConfig();
@@ -339,6 +432,11 @@ export async function runServer() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
     console.error(`Starting Swarm MCP server v${getCurrentVersion()}`);
+    // Start background monitor for agent completion notifications (non-blocking)
+    const agentsDir = await resolveAgentsDir();
+    startAgentMonitor(server, agentsDir).catch((err) => {
+        console.warn("[Swarm] Agent monitor failed to start:", err);
+    });
     // Health check
     const health = cliHealth;
     const available = Object.entries(health)
