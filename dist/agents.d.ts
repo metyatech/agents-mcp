@@ -1,5 +1,5 @@
-import { type AgentConfig } from './persistence.js';
-import { AgentType } from './parsers.js';
+import { type AgentConfig } from "./persistence.js";
+import { AgentType } from "./parsers.js";
 /**
  * Compute the Lowest Common Ancestor (LCA) of multiple file paths.
  * Returns the deepest common directory shared by all paths.
@@ -12,7 +12,7 @@ export declare enum AgentStatus {
     FAILED = "failed",
     STOPPED = "stopped"
 }
-export type { AgentType } from './parsers.js';
+export type { AgentType } from "./parsers.js";
 export declare function buildWindowsSpawnPs1(cmd: string[], stdoutPath: string, workingDirectory: string): string;
 /**
  * Split a shell command string into an argv array, handling single and double quotes.
@@ -27,7 +27,7 @@ export declare function buildWindowsSpawnPs1(cmd: string[], stdoutPath: string, 
 export declare function splitCommandTemplate(cmdStr: string): string[];
 export declare const AGENT_COMMANDS: Record<AgentType, string[]>;
 declare const VALID_MODES: readonly ["plan", "edit", "ralph"];
-type Mode = typeof VALID_MODES[number];
+type Mode = (typeof VALID_MODES)[number];
 export declare function resolveMode(requestedMode: string | null | undefined, defaultMode?: Mode): Mode;
 export declare function checkCliAvailable(agentType: AgentType): [boolean, string | null];
 export declare function checkAllClis(): Record<string, {

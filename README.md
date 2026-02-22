@@ -48,18 +48,19 @@ Both patterns use the same four tools. The orchestrator decides the pattern.
 ### Why Cross-Platform Matters
 
 Without this server, each agent is siloed:
+
 - Claude Code has built-in subagents, but only Claude
 - Codex has no native subagent support
 - Gemini CLI has no native subagent support
 
 With this server, every MCP client gets the same capabilities. Mix models based on their strengths:
 
-| Workflow | How It Works |
-|----------|--------------|
-| **Opus for planning, Codex for speed** | Use Claude Opus as orchestrator to design architecture, spawn Codex agents for fast, cheap implementation |
-| **Claude for research, Cursor for code** | Claude explores codebase and plans approach, Cursor (Composer) writes the code |
-| **Parallel specialists** | Claude reviews security while Codex adds validation - simultaneously |
-| **Codex spawning Claude** | When Codex hits something needing deeper reasoning, it spawns Claude |
+| Workflow                                 | How It Works                                                                                              |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Opus for planning, Codex for speed**   | Use Claude Opus as orchestrator to design architecture, spawn Codex agents for fast, cheap implementation |
+| **Claude for research, Cursor for code** | Claude explores codebase and plans approach, Cursor (Composer) writes the code                            |
+| **Parallel specialists**                 | Claude reviews security while Codex adds validation - simultaneously                                      |
+| **Codex spawning Claude**                | When Codex hits something needing deeper reasoning, it spawns Claude                                      |
 
 You control the cost tradeoffs. Expensive models for planning, fast models for execution.
 
@@ -133,14 +134,14 @@ Spawn(task_name, agent_type, prompt, mode?, cwd?, effort?)
 
 Start an agent on a task. Returns immediately with agent ID.
 
-| Parameter | Required | Description |
-| --- | --- | --- |
-| `task_name` | Yes | Groups related agents (e.g., "auth-feature") |
-| `agent_type` | Yes | `claude`, `codex`, `gemini`, or `cursor` |
-| `prompt` | Yes | The task for the agent |
-| `mode` | No | `plan` (default), `edit`, or `ralph` |
-| `cwd` | No | Working directory |
-| `effort` | No | `fast`, `default`, or `detailed` |
+| Parameter    | Required | Description                                  |
+| ------------ | -------- | -------------------------------------------- |
+| `task_name`  | Yes      | Groups related agents (e.g., "auth-feature") |
+| `agent_type` | Yes      | `claude`, `codex`, `gemini`, or `cursor`     |
+| `prompt`     | Yes      | The task for the agent                       |
+| `mode`       | No       | `plan` (default), `edit`, or `ralph`         |
+| `cwd`        | No       | Working directory                            |
+| `effort`     | No       | `fast`, `default`, or `detailed`             |
 
 ### Status
 
@@ -150,11 +151,11 @@ Status(task_name, filter?, since?)
 
 Get agent progress: files changed, commands run, last messages.
 
-| Parameter | Required | Description |
-| --- | --- | --- |
-| `task_name` | Yes | Task to check |
-| `filter` | No | `running` (default), `completed`, `failed`, `stopped`, `all` |
-| `since` | No | ISO timestamp for delta updates |
+| Parameter   | Required | Description                                                  |
+| ----------- | -------- | ------------------------------------------------------------ |
+| `task_name` | Yes      | Task to check                                                |
+| `filter`    | No       | `running` (default), `completed`, `failed`, `stopped`, `all` |
+| `since`     | No       | ISO timestamp for delta updates                              |
 
 ### Stop
 
@@ -174,11 +175,11 @@ List all tasks sorted by most recent activity. Defaults to 10.
 
 ## Modes
 
-| Mode | File Access | Auto-loop? | Use Case |
-| --- | --- | --- | --- |
-| `plan` | Read-only | No | Research, code review |
-| `edit` | Read + Write | No | Implementation, fixes |
-| `ralph` | Full | Yes | Autonomous via RALPH.md |
+| Mode    | File Access  | Auto-loop? | Use Case                |
+| ------- | ------------ | ---------- | ----------------------- |
+| `plan`  | Read-only    | No         | Research, code review   |
+| `edit`  | Read + Write | No         | Implementation, fixes   |
+| `ralph` | Full         | Yes        | Autonomous via RALPH.md |
 
 Default is `plan` for safety. Pass `mode='edit'` when agents need to modify files.
 
@@ -200,6 +201,7 @@ Add JWT-based auth to the backend.
 Protect API endpoints.
 
 ### Updates
+
 - Added sliding window counter
 ```
 
@@ -209,24 +211,24 @@ Spawn(mode='ralph', cwd='./my-project', prompt='Build the auth system')
 
 ## What This Server Does NOT Do
 
-| Not This | That's The Orchestrator's Job |
-|----------|-------------------------------|
-| Scheduling | Decides when to spawn which agents |
-| Task assignment | Writes prompts, defines what to do |
-| Conflict resolution | Assigns non-overlapping files to agents |
-| Intelligence | Pure infrastructure - no decision-making |
+| Not This            | That's The Orchestrator's Job            |
+| ------------------- | ---------------------------------------- |
+| Scheduling          | Decides when to spawn which agents       |
+| Task assignment     | Writes prompts, defines what to do       |
+| Conflict resolution | Assigns non-overlapping files to agents  |
+| Intelligence        | Pure infrastructure - no decision-making |
 
 The server is a tool. Your orchestrating agent (Claude, etc.) decides how to use it.
 
 ## Supported Agents
 
-| Agent | CLI | Best For |
-| --- | --- | --- |
-| Claude | `claude` | Complex research, orchestration |
-| Codex | `codex` | Fast implementation |
-| Gemini | `gemini` | Multi-system changes |
-| Cursor | `cursor-agent` | Debugging, tracing |
-| OpenCode | `opencode` | Provider-agnostic, open source |
+| Agent    | CLI            | Best For                        |
+| -------- | -------------- | ------------------------------- |
+| Claude   | `claude`       | Complex research, orchestration |
+| Codex    | `codex`        | Fast implementation             |
+| Gemini   | `gemini`       | Multi-system changes            |
+| Cursor   | `cursor-agent` | Debugging, tracing              |
+| OpenCode | `opencode`     | Provider-agnostic, open source  |
 
 ## Under the Hood
 
@@ -259,6 +261,7 @@ Each agent writes to its own log file (`stdout.log`). The Status tool reads thes
 ### Storage
 
 Data lives at `~/.agents/`:
+
 ```
 ~/.agents/
   config.json              # Agent configuration
@@ -269,11 +272,13 @@ Data lives at `~/.agents/`:
 ```
 
 **Plan mode** is read-only:
+
 - Claude: `--permission-mode plan`
 - Codex: sandboxed
 - Gemini/Cursor: no auto-approve
 
 **Edit mode** unlocks writes:
+
 - Claude: `acceptEdits`
 - Codex: `--full-auto`
 - Gemini: `--yolo`
@@ -285,11 +290,11 @@ Config lives at `~/.agents/swarm/config.json`. See [AGENTS.md](./AGENTS.md) for 
 
 ## Environment Variables
 
-| Variable | Description |
-| --- | --- |
-| `AGENTS_MCP_DEFAULT_MODE` | Default mode (`plan` or `edit`) |
-| `AGENTS_MCP_RALPH_FILE` | Task file name (default: `RALPH.md`) |
-| `AGENTS_MCP_DISABLE_RALPH` | Set `true` to disable ralph mode |
+| Variable                   | Description                          |
+| -------------------------- | ------------------------------------ |
+| `AGENTS_MCP_DEFAULT_MODE`  | Default mode (`plan` or `edit`)      |
+| `AGENTS_MCP_RALPH_FILE`    | Task file name (default: `RALPH.md`) |
+| `AGENTS_MCP_DISABLE_RALPH` | Set `true` to disable ralph mode     |
 
 ## Works great with the extension
 

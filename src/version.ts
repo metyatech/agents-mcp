@@ -1,10 +1,10 @@
 // Version checking module for @metyatech/agents-mcp
 // Checks npm registry for latest version and caches result
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { homedir } from 'os';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { homedir } from "os";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 
 // Types (exported for testing)
 export interface CacheData {
@@ -19,40 +19,40 @@ interface VersionStatus {
   current: string;
   latest: string | null;
   isOutOfDate: boolean;
-  status: 'current' | 'outdated' | 'unknown';
+  status: "current" | "outdated" | "unknown";
 }
 
-type ClientType = 'claude' | 'codex' | 'gemini' | 'unknown';
+type ClientType = "claude" | "codex" | "gemini" | "unknown";
 
 // Constants (exported for testing)
-export const CACHE_DIR = join(homedir(), '.agents', 'swarm');
-export const CACHE_FILE = join(CACHE_DIR, 'cache.json');
+export const CACHE_DIR = join(homedir(), ".agents", "swarm");
+export const CACHE_FILE = join(CACHE_DIR, "cache.json");
 export const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
-const NPM_REGISTRY_URL = 'https://registry.npmjs.org/@metyatech/agents-mcp/latest';
+const NPM_REGISTRY_URL = "https://registry.npmjs.org/@metyatech/agents-mcp/latest";
 const FETCH_TIMEOUT_MS = 3000;
 
 // Module state
 let versionStatus: VersionStatus | null = null;
-let detectedClient: ClientType = 'unknown';
+let detectedClient: ClientType = "unknown";
 
 // Get current version from package.json
-  export function getCurrentVersion(): string {
-    try {
-      const __dirname = dirname(fileURLToPath(import.meta.url));
-      const pkgPath = join(__dirname, '..', 'package.json');
-      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version?: string };
-      return pkg.version || '0.2.6';
-    } catch {
-      return '0.2.6';
-    }
+export function getCurrentVersion(): string {
+  try {
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const pkgPath = join(__dirname, "..", "package.json");
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { version?: string };
+    return pkg.version || "0.2.6";
+  } catch {
+    return "0.2.6";
   }
+}
 
 // Load cache from disk
 // Exported for testing
 export function loadCache(): CacheData {
   try {
     if (existsSync(CACHE_FILE)) {
-      return JSON.parse(readFileSync(CACHE_FILE, 'utf-8')) as CacheData;
+      return JSON.parse(readFileSync(CACHE_FILE, "utf-8")) as CacheData;
     }
   } catch {
     // Ignore read errors
@@ -81,7 +81,7 @@ async function fetchLatestVersion(): Promise<string | null> {
 
     const response = await fetch(NPM_REGISTRY_URL, {
       signal: controller.signal,
-      headers: { Accept: 'application/json' },
+      headers: { Accept: "application/json" }
     });
 
     clearTimeout(timeoutId);
@@ -98,8 +98,8 @@ async function fetchLatestVersion(): Promise<string | null> {
 // Compare semver versions (simple comparison)
 // Exported for testing
 export function isNewerVersion(current: string, latest: string): boolean {
-  const currentParts = current.split('.').map(Number);
-  const latestParts = latest.split('.').map(Number);
+  const currentParts = current.split(".").map(Number);
+  const latestParts = latest.split(".").map(Number);
 
   for (let i = 0; i < 3; i++) {
     const c = currentParts[i] || 0;
@@ -126,7 +126,7 @@ export async function initVersionCheck(): Promise<VersionStatus> {
       current,
       latest: cachedVersion.latest,
       isOutOfDate,
-      status: isOutOfDate ? 'outdated' : 'current',
+      status: isOutOfDate ? "outdated" : "current"
     };
     return versionStatus;
   }
@@ -144,7 +144,7 @@ export async function initVersionCheck(): Promise<VersionStatus> {
       current,
       latest,
       isOutOfDate,
-      status: isOutOfDate ? 'outdated' : 'current',
+      status: isOutOfDate ? "outdated" : "current"
     };
   } else {
     // Network failed, use stale cache or unknown
@@ -154,14 +154,14 @@ export async function initVersionCheck(): Promise<VersionStatus> {
         current,
         latest: cachedVersion.latest,
         isOutOfDate,
-        status: isOutOfDate ? 'outdated' : 'current',
+        status: isOutOfDate ? "outdated" : "current"
       };
     } else {
       versionStatus = {
         current,
         latest: null,
         isOutOfDate: false,
-        status: 'unknown',
+        status: "unknown"
       };
     }
   }
@@ -176,37 +176,37 @@ export function setDetectedClient(client: ClientType): void {
 
 // Detect client from clientInfo name
 export function detectClientFromName(name: string | undefined): ClientType {
-  if (!name) return 'unknown';
+  if (!name) return "unknown";
   const lower = name.toLowerCase();
-  if (lower.includes('claude')) return 'claude';
-  if (lower.includes('codex')) return 'codex';
-  if (lower.includes('gemini')) return 'gemini';
-  return 'unknown';
+  if (lower.includes("claude")) return "claude";
+  if (lower.includes("codex")) return "codex";
+  if (lower.includes("gemini")) return "gemini";
+  return "unknown";
 }
 
 // Get update command for client
 function getUpdateCommand(client: ClientType): string {
   switch (client) {
-    case 'claude':
-      return 'claude mcp add --scope user Swarm -- npx -y --package git+https://github.com/metyatech/agents-mcp.git#main agents-mcp';
-    case 'codex':
-      return 'codex mcp add swarm -- npx -y --package git+https://github.com/metyatech/agents-mcp.git#main agents-mcp';
-    case 'gemini':
-      return 'gemini mcp add Swarm -- npx -y --package git+https://github.com/metyatech/agents-mcp.git#main agents-mcp';
+    case "claude":
+      return "claude mcp add --scope user Swarm -- npx -y --package git+https://github.com/metyatech/agents-mcp.git#main agents-mcp";
+    case "codex":
+      return "codex mcp add swarm -- npx -y --package git+https://github.com/metyatech/agents-mcp.git#main agents-mcp";
+    case "gemini":
+      return "gemini mcp add Swarm -- npx -y --package git+https://github.com/metyatech/agents-mcp.git#main agents-mcp";
     default:
       return [
-        'Claude: claude mcp add --scope user Swarm -- npx -y --package git+https://github.com/metyatech/agents-mcp.git#main agents-mcp',
-        'Codex: codex mcp add swarm -- npx -y --package git+https://github.com/metyatech/agents-mcp.git#main agents-mcp',
-        'Gemini: gemini mcp add Swarm -- npx -y --package git+https://github.com/metyatech/agents-mcp.git#main agents-mcp',
-      ].join('\n');
+        "Claude: claude mcp add --scope user Swarm -- npx -y --package git+https://github.com/metyatech/agents-mcp.git#main agents-mcp",
+        "Codex: codex mcp add swarm -- npx -y --package git+https://github.com/metyatech/agents-mcp.git#main agents-mcp",
+        "Gemini: gemini mcp add Swarm -- npx -y --package git+https://github.com/metyatech/agents-mcp.git#main agents-mcp"
+      ].join("\n");
   }
 }
 
 // Build version notice for tool descriptions
 export function buildVersionNotice(): string {
-  if (!versionStatus) return '';
+  if (!versionStatus) return "";
 
-  if (versionStatus.status === 'outdated') {
+  if (versionStatus.status === "outdated") {
     const cmd = getUpdateCommand(detectedClient);
     return `\n\n---\nWARNING: Your Swarm MCP server (v${versionStatus.current}) is out of date. Latest: v${versionStatus.latest}.\nPlease update:\n${cmd}`;
   }
@@ -216,7 +216,7 @@ export function buildVersionNotice(): string {
   //   return `\n\n---\nSwarm MCP server v${versionStatus.current} is up to date.`;
   // }
 
-  return '';
+  return "";
 }
 
 // Get current version status

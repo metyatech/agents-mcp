@@ -1,15 +1,15 @@
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { homedir, tmpdir } from 'os';
-import { constants as fsConstants } from 'fs';
+import * as fs from "fs/promises";
+import * as path from "path";
+import { homedir, tmpdir } from "os";
+import { constants as fsConstants } from "fs";
 // All supported swarm agent types
-const ALL_AGENTS = ['claude', 'codex', 'gemini', 'cursor', 'opencode', 'copilot'];
+const ALL_AGENTS = ["claude", "codex", "gemini", "cursor", "opencode", "copilot"];
 // Swarm data lives under ~/.agents/swarm/
-const SWARM_DIR = path.join(homedir(), '.agents', 'swarm');
+const SWARM_DIR = path.join(homedir(), ".agents", "swarm");
 // Legacy paths (for migration)
-const LEGACY_CONFIG_DIR = path.join(homedir(), '.agents');
-const LEGACY_BASE_DIR = path.join(homedir(), '.swarmify');
-const TMP_FALLBACK_DIR = path.join(tmpdir(), 'agents');
+const LEGACY_CONFIG_DIR = path.join(homedir(), ".agents");
+const LEGACY_BASE_DIR = path.join(homedir(), ".swarmify");
+const TMP_FALLBACK_DIR = path.join(tmpdir(), "agents");
 async function pathExists(p) {
     try {
         await fs.access(p);
@@ -37,21 +37,21 @@ export async function resolveBaseDir() {
         console.warn(`[agents-mcp] Falling back to temp data dir at ${TMP_FALLBACK_DIR}`);
         return TMP_FALLBACK_DIR;
     }
-    throw new Error('Unable to determine writable data directory for swarm');
+    throw new Error("Unable to determine writable data directory for swarm");
 }
 async function resolveAgentsPath() {
     const base = await resolveBaseDir();
-    return path.join(base, 'agents');
+    return path.join(base, "agents");
 }
 async function resolveConfigPath() {
     await fs.mkdir(SWARM_DIR, { recursive: true });
-    return path.join(SWARM_DIR, 'config.json');
+    return path.join(SWARM_DIR, "config.json");
 }
 async function resolveLegacyConfigPath() {
-    return path.join(LEGACY_CONFIG_DIR, 'config.json');
+    return path.join(LEGACY_CONFIG_DIR, "config.json");
 }
 async function resolveLegacySwarmifyConfigPath() {
-    return path.join(LEGACY_BASE_DIR, 'agents', 'config.json');
+    return path.join(LEGACY_BASE_DIR, "agents", "config.json");
 }
 let AGENTS_DIR = null;
 let CONFIG_PATH = null;
@@ -74,64 +74,64 @@ async function ensureConfigPath() {
 function getDefaultAgentConfig(agentType) {
     const defaults = {
         claude: {
-            command: 'claude -p \'{prompt}\' --output-format stream-json',
+            command: "claude -p '{prompt}' --output-format stream-json",
             enabled: true,
             models: {
-                fast: 'claude-haiku-4-5-20251001',
-                default: 'claude-sonnet-4-6',
-                detailed: 'claude-opus-4-6'
+                fast: "claude-haiku-4-5-20251001",
+                default: "claude-sonnet-4-6",
+                detailed: "claude-opus-4-6"
             },
-            provider: 'anthropic'
+            provider: "anthropic"
         },
         codex: {
-            command: 'codex exec --dangerously-bypass-approvals-and-sandbox \'{prompt}\' --json',
+            command: "codex exec --dangerously-bypass-approvals-and-sandbox '{prompt}' --json",
             enabled: true,
             models: {
-                fast: 'gpt-5.1-codex-mini',
-                default: 'gpt-5.3-codex',
-                detailed: 'gpt-5.3-codex'
+                fast: "gpt-5.1-codex-mini",
+                default: "gpt-5.3-codex",
+                detailed: "gpt-5.3-codex"
             },
-            provider: 'openai'
+            provider: "openai"
         },
         gemini: {
-            command: 'gemini -p \'{prompt}\' --output-format stream-json',
+            command: "gemini -p '{prompt}' --output-format stream-json",
             enabled: true,
             models: {
-                fast: 'gemini-3-flash-preview',
-                default: 'gemini-3-flash-preview',
-                detailed: 'gemini-3-pro-preview'
+                fast: "gemini-3-flash-preview",
+                default: "gemini-3-flash-preview",
+                detailed: "gemini-3-pro-preview"
             },
-            provider: 'google'
+            provider: "google"
         },
         cursor: {
-            command: 'cursor-agent -p --output-format stream-json \'{prompt}\'',
+            command: "cursor-agent -p --output-format stream-json '{prompt}'",
             enabled: true,
             models: {
-                fast: 'composer-1',
-                default: 'composer-1',
-                detailed: 'composer-1'
+                fast: "composer-1",
+                default: "composer-1",
+                detailed: "composer-1"
             },
-            provider: 'custom'
+            provider: "custom"
         },
         opencode: {
-            command: 'opencode run --format json \'{prompt}\'',
+            command: "opencode run --format json '{prompt}'",
             enabled: true,
             models: {
-                fast: 'zai-coding-plan/glm-4.7-flash',
-                default: 'zai-coding-plan/glm-4.7',
-                detailed: 'zai-coding-plan/glm-4.7'
+                fast: "zai-coding-plan/glm-4.7-flash",
+                default: "zai-coding-plan/glm-4.7",
+                detailed: "zai-coding-plan/glm-4.7"
             },
-            provider: 'custom'
+            provider: "custom"
         },
         copilot: {
-            command: 'copilot -p \'{prompt}\' -s',
+            command: "copilot -p '{prompt}' -s",
             enabled: true,
             models: {
-                fast: 'claude-sonnet-4',
-                default: 'claude-sonnet-4.5',
-                detailed: 'gpt-5'
+                fast: "claude-sonnet-4",
+                default: "claude-sonnet-4.5",
+                detailed: "gpt-5"
             },
-            provider: 'github'
+            provider: "github"
         }
     };
     return defaults[agentType];
@@ -140,19 +140,19 @@ function getDefaultAgentConfig(agentType) {
 function getDefaultProviderConfig() {
     return {
         anthropic: {
-            apiEndpoint: 'https://api.anthropic.com'
+            apiEndpoint: "https://api.anthropic.com"
         },
         openai: {
-            apiEndpoint: 'https://api.openai.com/v1'
+            apiEndpoint: "https://api.openai.com/v1"
         },
         google: {
-            apiEndpoint: 'https://generativelanguage.googleapis.com/v1'
+            apiEndpoint: "https://generativelanguage.googleapis.com/v1"
         },
         custom: {
             apiEndpoint: null
         },
         github: {
-            apiEndpoint: 'https://api.github.com'
+            apiEndpoint: "https://api.github.com"
         }
     };
 }
@@ -170,12 +170,12 @@ function getDefaultSwarmConfig() {
 // Try to read a config file as either SwarmConfig or legacy format
 async function tryReadLegacyConfig(configPath) {
     try {
-        const data = await fs.readFile(configPath, 'utf-8');
+        const data = await fs.readFile(configPath, "utf-8");
         const parsed = JSON.parse(data);
         // New format: has agents object with nested configs
-        if (parsed.agents && typeof parsed.agents === 'object') {
+        if (parsed.agents && typeof parsed.agents === "object") {
             const firstValue = Object.values(parsed.agents)[0];
-            if (firstValue && typeof firstValue === 'object' && 'models' in firstValue) {
+            if (firstValue && typeof firstValue === "object" && "models" in firstValue) {
                 return parsed;
             }
         }
@@ -218,13 +218,13 @@ export async function readConfig() {
     const configPath = await ensureConfigPath();
     // Try to read new config first
     try {
-        const data = await fs.readFile(configPath, 'utf-8');
+        const data = await fs.readFile(configPath, "utf-8");
         const config = JSON.parse(data);
         const enabledAgents = [];
         const agentConfigs = {};
         const providerConfigs = {};
         // Parse agent configs
-        if (config.agents && typeof config.agents === 'object') {
+        if (config.agents && typeof config.agents === "object") {
             for (const [agentKey, agentValue] of Object.entries(config.agents)) {
                 if (!ALL_AGENTS.includes(agentKey))
                     continue;
@@ -248,7 +248,7 @@ export async function readConfig() {
             }
         }
         // Parse provider configs
-        if (config.providers && typeof config.providers === 'object') {
+        if (config.providers && typeof config.providers === "object") {
             for (const [providerKey, providerValue] of Object.entries(config.providers)) {
                 const providerConfig = providerValue;
                 providerConfigs[providerKey] = providerConfig;
@@ -312,7 +312,7 @@ export async function setAgentEnabled(agentType, enabled) {
     const { agentConfigs } = await readConfig();
     agentConfigs[agentType].enabled = enabled;
     const configPath = await ensureConfigPath();
-    const config = await fs.readFile(configPath, 'utf-8');
+    const config = await fs.readFile(configPath, "utf-8");
     const parsed = JSON.parse(config);
     if (!parsed.agents[agentType]) {
         parsed.agents[agentType] = getDefaultAgentConfig(agentType);

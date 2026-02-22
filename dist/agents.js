@@ -1,39 +1,39 @@
-import { spawn } from 'child_process';
-import { accessSync, constants as fsConstants, existsSync } from 'fs';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import * as os from 'os';
-import { randomUUID } from 'crypto';
-import { resolveAgentsDir } from './persistence.js';
-import { normalizeEvents } from './parsers.js';
+import { spawn } from "child_process";
+import { accessSync, constants as fsConstants, existsSync } from "fs";
+import * as fs from "fs/promises";
+import * as path from "path";
+import * as os from "os";
+import { randomUUID } from "crypto";
+import { resolveAgentsDir } from "./persistence.js";
+import { normalizeEvents } from "./parsers.js";
 /**
  * Compute the Lowest Common Ancestor (LCA) of multiple file paths.
  * Returns the deepest common directory shared by all paths.
  * Returns null if paths is empty or paths have no common ancestor (different roots).
  */
 export function computePathLCA(paths) {
-    const validPaths = paths.filter(p => p && p.trim());
+    const validPaths = paths.filter((p) => p && p.trim());
     if (validPaths.length === 0)
         return null;
     if (validPaths.length === 1)
         return path.resolve(validPaths[0]);
-    const resolved = validPaths.map(p => path.resolve(p));
-    const parsed = resolved.map(p => {
+    const resolved = validPaths.map((p) => path.resolve(p));
+    const parsed = resolved.map((p) => {
         const root = path.parse(p).root;
         const rest = p.slice(root.length);
         const parts = rest.split(path.sep).filter(Boolean);
         return { root, parts };
     });
-    const normalizeRoot = (r) => (process.platform === 'win32' ? r.toLowerCase() : r);
+    const normalizeRoot = (r) => (process.platform === "win32" ? r.toLowerCase() : r);
     const root0 = parsed[0].root;
-    const sameRoot = parsed.every(p => normalizeRoot(p.root) === normalizeRoot(root0));
+    const sameRoot = parsed.every((p) => normalizeRoot(p.root) === normalizeRoot(root0));
     if (!sameRoot)
         return null;
-    const minLen = Math.min(...parsed.map(p => p.parts.length));
+    const minLen = Math.min(...parsed.map((p) => p.parts.length));
     const commonParts = [];
     for (let i = 0; i < minLen; i++) {
         const segment = parsed[0].parts[i];
-        const allMatch = parsed.every(p => p.parts[i] === segment);
+        const allMatch = parsed.every((p) => p.parts[i] === segment);
         if (!allMatch)
             break;
         commonParts.push(segment);
@@ -54,12 +54,12 @@ export function buildWindowsSpawnPs1(cmd, stdoutPath, workingDirectory) {
     // In PowerShell single-quoted strings, only ' needs escaping (doubled: '').
     // Backslashes are literal, so Windows paths need no extra escaping.
     const psEsc = (s) => s.replace(/'/g, "''");
-    const toB64 = (s) => Buffer.from(s, 'utf8').toString('base64');
+    const toB64 = (s) => Buffer.from(s, "utf8").toString("base64");
     // IMPORTANT: do not embed raw argument text directly in '...' because PowerShell
     // treats smart quotes (e.g. U+2019 RIGHT SINGLE QUOTATION MARK) as quote tokens,
     // which can break parsing and cause the wrapper script to fail immediately.
     // Base64 encode each argument and decode it inside PowerShell.
-    const argListLines = cmd.slice(1).map(a => {
+    const argListLines = cmd.slice(1).map((a) => {
         const b64 = toB64(a);
         return `$psi.ArgumentList.Add($enc.GetString([System.Convert]::FromBase64String('${b64}')))`;
     });
@@ -100,9 +100,9 @@ export function buildWindowsSpawnPs1(cmd, stdoutPath, workingDirectory) {
         // Append a JSON sentinel line with the real exit code so readNewEvents() can
         // determine the correct COMPLETED/FAILED status without guessing.
         `$exitJson = '{"__exit_code__":' + $p.ExitCode.ToString() + '}'`,
-        `[System.IO.File]::WriteAllText('${psEsc(stdoutPath)}', $outTask.Result + $errTask.Result + [Environment]::NewLine + $exitJson + [Environment]::NewLine, $enc)`,
+        `[System.IO.File]::WriteAllText('${psEsc(stdoutPath)}', $outTask.Result + $errTask.Result + [Environment]::NewLine + $exitJson + [Environment]::NewLine, $enc)`
     ];
-    return psLines.join('\n');
+    return psLines.join("\n");
 }
 /**
  * Split a shell command string into an argv array, handling single and double quotes.
@@ -116,7 +116,7 @@ export function buildWindowsSpawnPs1(cmd, stdoutPath, workingDirectory) {
  */
 export function splitCommandTemplate(cmdStr) {
     const result = [];
-    let current = '';
+    let current = "";
     let inSingleQuote = false;
     let inDoubleQuote = false;
     for (let i = 0; i < cmdStr.length; i++) {
@@ -133,9 +133,9 @@ export function splitCommandTemplate(cmdStr) {
             if (ch === '"') {
                 inDoubleQuote = false;
             }
-            else if (ch === '\\') {
+            else if (ch === "\\") {
                 const next = cmdStr[i + 1];
-                if (next === '"' || next === '\\') {
+                if (next === '"' || next === "\\") {
                     current += next;
                     i++;
                 }
@@ -154,10 +154,10 @@ export function splitCommandTemplate(cmdStr) {
             else if (ch === '"') {
                 inDoubleQuote = true;
             }
-            else if (ch === ' ' || ch === '\t') {
+            else if (ch === " " || ch === "\t") {
                 if (current.length > 0) {
                     result.push(current);
-                    current = '';
+                    current = "";
                 }
             }
             else {
@@ -178,18 +178,18 @@ function isCompatibleAgentCli(agentType, firstArg) {
         return false;
     const exe = path.basename(firstArg).toLowerCase();
     switch (agentType) {
-        case 'codex':
-            return exe === 'codex' || exe === 'codex.exe';
-        case 'claude':
-            return exe === 'claude' || exe === 'claude.exe';
-        case 'gemini':
-            return exe === 'gemini' || exe === 'gemini.exe';
-        case 'cursor':
-            return exe === 'cursor-agent' || exe === 'cursor-agent.exe';
-        case 'opencode':
-            return exe === 'opencode' || exe === 'opencode.exe';
-        case 'copilot':
-            return exe === 'copilot' || exe === 'copilot.exe';
+        case "codex":
+            return exe === "codex" || exe === "codex.exe";
+        case "claude":
+            return exe === "claude" || exe === "claude.exe";
+        case "gemini":
+            return exe === "gemini" || exe === "gemini.exe";
+        case "cursor":
+            return exe === "cursor-agent" || exe === "cursor-agent.exe";
+        case "opencode":
+            return exe === "opencode" || exe === "opencode.exe";
+        case "copilot":
+            return exe === "copilot" || exe === "copilot.exe";
         default:
             return false;
     }
@@ -208,92 +208,101 @@ function ensureClaudeFlag(cmd, flag, value) {
     return out;
 }
 function ensureGeminiHeadlessFlag(cmd, promptText) {
-    if (cmd.includes('-p') || cmd.includes('--prompt'))
+    if (cmd.includes("-p") || cmd.includes("--prompt"))
         return [...cmd];
     const out = [...cmd];
     const promptIdx = out.indexOf(promptText);
     if (promptIdx !== -1) {
-        out.splice(promptIdx, 0, '-p');
+        out.splice(promptIdx, 0, "-p");
     }
     else {
-        out.push('-p');
+        out.push("-p");
     }
     return out;
 }
 // Base commands for plan mode (read-only, may prompt for confirmation)
 export const AGENT_COMMANDS = {
-    codex: ['codex', 'exec', '--dangerously-bypass-approvals-and-sandbox', '{prompt}', '--json'],
-    cursor: ['cursor-agent', '-p', '--output-format', 'stream-json', '{prompt}'],
-    gemini: ['gemini', '-p', '{prompt}', '--output-format', 'stream-json'],
-    claude: ['claude', '-p', '--verbose', '{prompt}', '--output-format', 'stream-json', '--permission-mode', 'plan'],
-    opencode: ['opencode', 'run', '--format', 'json', '{prompt}'],
-    copilot: ['copilot', '-p', '{prompt}', '-s'],
+    codex: ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "{prompt}", "--json"],
+    cursor: ["cursor-agent", "-p", "--output-format", "stream-json", "{prompt}"],
+    gemini: ["gemini", "-p", "{prompt}", "--output-format", "stream-json"],
+    claude: [
+        "claude",
+        "-p",
+        "--verbose",
+        "{prompt}",
+        "--output-format",
+        "stream-json",
+        "--permission-mode",
+        "plan"
+    ],
+    opencode: ["opencode", "run", "--format", "json", "{prompt}"],
+    copilot: ["copilot", "-p", "{prompt}", "-s"]
 };
 // Load default agent configs from persistence
 function loadDefaultAgentConfigs() {
     // Use hardcoded defaults for backward compatibility with synchronous initialization
     return {
         claude: {
-            command: 'claude -p \'{prompt}\' --output-format stream-json',
+            command: "claude -p '{prompt}' --output-format stream-json",
             enabled: true,
             models: {
-                fast: 'claude-haiku-4-5-20251001',
-                default: 'claude-sonnet-4-6',
-                detailed: 'claude-opus-4-6'
+                fast: "claude-haiku-4-5-20251001",
+                default: "claude-sonnet-4-6",
+                detailed: "claude-opus-4-6"
             },
-            provider: 'anthropic'
+            provider: "anthropic"
         },
         codex: {
             // Note: gpt-5.3 (general GPT) and gpt-5.3-codex (coding-optimized) are distinct models.
             // Use gpt-5.3-codex for code/execution tasks; gpt-5.3 via explicit model param for general reasoning.
-            command: 'codex exec --sandbox danger-full-access \'{prompt}\' --json',
+            command: "codex exec --sandbox danger-full-access '{prompt}' --json",
             enabled: true,
             models: {
-                fast: 'gpt-5.1-codex-mini',
-                default: 'gpt-5.3-codex',
-                detailed: 'gpt-5.3-codex'
+                fast: "gpt-5.1-codex-mini",
+                default: "gpt-5.3-codex",
+                detailed: "gpt-5.3-codex"
             },
-            provider: 'openai'
+            provider: "openai"
         },
         gemini: {
-            command: 'gemini -p \'{prompt}\' --output-format stream-json',
+            command: "gemini -p '{prompt}' --output-format stream-json",
             enabled: true,
             models: {
-                fast: 'gemini-3-flash-preview',
-                default: 'gemini-3-flash-preview',
-                detailed: 'gemini-3-pro-preview'
+                fast: "gemini-3-flash-preview",
+                default: "gemini-3-flash-preview",
+                detailed: "gemini-3-pro-preview"
             },
-            provider: 'google'
+            provider: "google"
         },
         cursor: {
-            command: 'cursor-agent -p --output-format stream-json \'{prompt}\'',
+            command: "cursor-agent -p --output-format stream-json '{prompt}'",
             enabled: true,
             models: {
-                fast: 'composer-1',
-                default: 'composer-1',
-                detailed: 'composer-1'
+                fast: "composer-1",
+                default: "composer-1",
+                detailed: "composer-1"
             },
-            provider: 'custom'
+            provider: "custom"
         },
         opencode: {
-            command: 'opencode run --format json \'{prompt}\'',
+            command: "opencode run --format json '{prompt}'",
             enabled: true,
             models: {
-                fast: 'zai-coding-plan/glm-4.7-flash',
-                default: 'zai-coding-plan/glm-4.7',
-                detailed: 'zai-coding-plan/glm-4.7'
+                fast: "zai-coding-plan/glm-4.7-flash",
+                default: "zai-coding-plan/glm-4.7",
+                detailed: "zai-coding-plan/glm-4.7"
             },
-            provider: 'custom'
+            provider: "custom"
         },
         copilot: {
-            command: 'copilot -p \'{prompt}\' -s',
+            command: "copilot -p '{prompt}' -s",
             enabled: true,
             models: {
-                fast: 'claude-sonnet-4',
-                default: 'claude-sonnet-4.5',
-                detailed: 'gpt-5'
+                fast: "claude-sonnet-4",
+                default: "claude-sonnet-4.5",
+                detailed: "gpt-5"
             },
-            provider: 'github'
+            provider: "github"
         }
     };
 }
@@ -308,7 +317,7 @@ When you're done, provide a brief summary of:
 const CLAUDE_PLAN_MODE_PREFIX = `You are running in HEADLESS PLAN MODE. This mode works like normal plan mode with one exception: you cannot write to ~/.claude/plans/ directory. Instead of writing a plan file, output your complete plan/response as your final message.
 
 `;
-const VALID_MODES = ['plan', 'edit', 'ralph'];
+const VALID_MODES = ["plan", "edit", "ralph"];
 function normalizeModeValue(modeValue) {
     if (!modeValue)
         return null;
@@ -319,7 +328,7 @@ function normalizeModeValue(modeValue) {
     return null;
 }
 function defaultModeFromEnv() {
-    for (const envVar of ['AGENTS_MCP_MODE', 'AGENTS_MCP_DEFAULT_MODE']) {
+    for (const envVar of ["AGENTS_MCP_MODE", "AGENTS_MCP_DEFAULT_MODE"]) {
         const rawValue = process.env[envVar];
         const parsed = normalizeModeValue(rawValue);
         if (parsed) {
@@ -329,17 +338,17 @@ function defaultModeFromEnv() {
             console.warn(`Invalid ${envVar}='${rawValue}'. Use 'plan' or 'edit'. Falling back to plan mode.`);
         }
     }
-    return 'plan';
+    return "plan";
 }
 function coerceDate(value) {
     if (value === null || value === undefined)
         return null;
-    if (typeof value === 'number' && Number.isFinite(value)) {
+    if (typeof value === "number" && Number.isFinite(value)) {
         const ms = value < 1e12 ? value * 1000 : value;
         const date = new Date(ms);
         return Number.isNaN(date.getTime()) ? null : date;
     }
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
         const trimmed = value.trim();
         if (!trimmed)
             return null;
@@ -356,7 +365,7 @@ function coerceDate(value) {
     return null;
 }
 function extractTimestamp(raw) {
-    if (!raw || typeof raw !== 'object')
+    if (!raw || typeof raw !== "object")
         return null;
     const candidates = [
         raw.timestamp,
@@ -365,7 +374,7 @@ function extractTimestamp(raw) {
         raw.createdAt,
         raw.ts,
         raw.started_at,
-        raw.startedAt,
+        raw.startedAt
     ];
     for (const candidate of candidates) {
         const date = coerceDate(candidate);
@@ -374,7 +383,7 @@ function extractTimestamp(raw) {
     }
     return null;
 }
-export function resolveMode(requestedMode, defaultMode = 'plan') {
+export function resolveMode(requestedMode, defaultMode = "plan") {
     const normalizedDefault = normalizeModeValue(defaultMode);
     if (!normalizedDefault) {
         throw new Error(`Invalid default mode '${defaultMode}'. Use 'plan' or 'edit'.`);
@@ -389,12 +398,12 @@ export function resolveMode(requestedMode, defaultMode = 'plan') {
     return normalizedDefault;
 }
 function findExecutableOnPath(executable) {
-    const hasSeparator = executable.includes(path.sep) || (process.platform === 'win32' && executable.includes('/'));
+    const hasSeparator = executable.includes(path.sep) || (process.platform === "win32" && executable.includes("/"));
     const pathCandidate = hasSeparator || path.isAbsolute(executable) ? executable : null;
     const isFileUsable = (candidatePath) => {
         if (!existsSync(candidatePath))
             return false;
-        if (process.platform === 'win32')
+        if (process.platform === "win32")
             return true;
         try {
             accessSync(candidatePath, fsConstants.X_OK);
@@ -420,21 +429,19 @@ function findExecutableOnPath(executable) {
         return null;
     };
     if (pathCandidate) {
-        const extensions = process.platform === 'win32'
-            ? ['.exe', '.cmd', '.bat', '.ps1']
-            : [''];
+        const extensions = process.platform === "win32" ? [".exe", ".cmd", ".bat", ".ps1"] : [""];
         return tryWithExtensions(path.resolve(pathCandidate), extensions);
     }
-    const envPath = process.env.PATH || '';
+    const envPath = process.env.PATH || "";
     const pathParts = envPath.split(path.delimiter).filter(Boolean);
-    if (process.platform === 'win32') {
-        const pathextRaw = process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD';
+    if (process.platform === "win32") {
+        const pathextRaw = process.env.PATHEXT || ".COM;.EXE;.BAT;.CMD";
         const pathext = pathextRaw
-            .split(';')
-            .map(e => e.trim())
+            .split(";")
+            .map((e) => e.trim())
             .filter(Boolean)
-            .map(e => (e.startsWith('.') ? e.toLowerCase() : `.${e.toLowerCase()}`));
-        const extra = ['.exe', '.cmd', '.bat', '.ps1'];
+            .map((e) => (e.startsWith(".") ? e.toLowerCase() : `.${e.toLowerCase()}`));
+        const extra = [".exe", ".cmd", ".bat", ".ps1"];
         const extensions = Array.from(new Set([...pathext, ...extra]));
         for (const dir of pathParts) {
             const base = path.join(dir, executable);
@@ -489,7 +496,7 @@ export class AgentProcess {
     prompt;
     cwd;
     workspaceDir;
-    mode = 'plan';
+    mode = "plan";
     pid = null;
     status = AgentStatus.RUNNING;
     startedAt = new Date();
@@ -502,7 +509,7 @@ export class AgentProcess {
     eventsCache = [];
     lastReadPos = 0;
     baseDir = null;
-    constructor(agentId, taskName, agentType, prompt, cwd = null, mode = 'plan', pid = null, status = AgentStatus.RUNNING, startedAt = new Date(), completedAt = null, baseDir = null, parentSessionId = null, workspaceDir = null, sessionId = null, conversationTurn = 0, originalAgentId = null, replyAgentIds = []) {
+    constructor(agentId, taskName, agentType, prompt, cwd = null, mode = "plan", pid = null, status = AgentStatus.RUNNING, startedAt = new Date(), completedAt = null, baseDir = null, parentSessionId = null, workspaceDir = null, sessionId = null, conversationTurn = 0, originalAgentId = null, replyAgentIds = []) {
         this.agentId = agentId;
         this.taskName = taskName;
         this.agentType = agentType;
@@ -522,17 +529,17 @@ export class AgentProcess {
         this.replyAgentIds = replyAgentIds;
     }
     get isEditMode() {
-        return this.mode === 'edit';
+        return this.mode === "edit";
     }
     async getAgentDir() {
-        const base = this.baseDir || await getAgentsDir();
+        const base = this.baseDir || (await getAgentsDir());
         return path.join(base, this.agentId);
     }
     async getStdoutPath() {
-        return path.join(await this.getAgentDir(), 'stdout.log');
+        return path.join(await this.getAgentDir(), "stdout.log");
     }
     async getMetaPath() {
-        return path.join(await this.getAgentDir(), 'meta.json');
+        return path.join(await this.getAgentDir(), "meta.json");
     }
     toDict() {
         return {
@@ -550,7 +557,7 @@ export class AgentProcess {
             session_id: this.sessionId,
             conversation_turn: this.conversationTurn,
             original_agent_id: this.originalAgentId,
-            reply_agent_ids: this.replyAgentIds,
+            reply_agent_ids: this.replyAgentIds
         };
     }
     duration() {
@@ -601,21 +608,24 @@ export class AgentProcess {
             if (!stats)
                 return;
             const fallbackTimestamp = (stats.mtime || new Date()).toISOString();
-            const fd = await fs.open(stdoutPath, 'r');
+            const fd = await fs.open(stdoutPath, "r");
             const buffer = Buffer.alloc(1024 * 1024);
             const { bytesRead } = await fd.read(buffer, 0, buffer.length, this.lastReadPos);
             await fd.close();
             if (bytesRead === 0)
                 return;
-            const newContent = buffer.toString('utf-8', 0, bytesRead);
+            const newContent = buffer.toString("utf-8", 0, bytesRead);
             this.lastReadPos += bytesRead;
-            const lines = newContent.split('\n').map(l => l.trim()).filter(l => l);
+            const lines = newContent
+                .split("\n")
+                .map((l) => l.trim())
+                .filter((l) => l);
             for (const line of lines) {
                 try {
                     const rawEvent = JSON.parse(line);
                     // Exit code sentinel written by buildWindowsSpawnPs1() — use the real
                     // process exit code to set COMPLETED/FAILED instead of guessing.
-                    if (rawEvent && typeof rawEvent === 'object' && '__exit_code__' in rawEvent) {
+                    if (rawEvent && typeof rawEvent === "object" && "__exit_code__" in rawEvent) {
                         const exitCode = rawEvent.__exit_code__;
                         if (exitCode === 0) {
                             this.status = AgentStatus.COMPLETED;
@@ -632,15 +642,17 @@ export class AgentProcess {
                         event.timestamp = resolvedTimestamp;
                         this.eventsCache.push(event);
                         // Extract session_id from init events for resume/reply support
-                        if (event.type === 'init' && event.session_id && !this.sessionId) {
+                        if (event.type === "init" && event.session_id && !this.sessionId) {
                             this.sessionId = event.session_id;
                         }
-                        if (event.type === 'result' || event.type === 'turn.completed' || event.type === 'thread.completed') {
-                            if (event.status === 'success' || event.type === 'turn.completed') {
+                        if (event.type === "result" ||
+                            event.type === "turn.completed" ||
+                            event.type === "thread.completed") {
+                            if (event.status === "success" || event.type === "turn.completed") {
                                 this.status = AgentStatus.COMPLETED;
                                 this.completedAt = event.timestamp ? new Date(event.timestamp) : new Date();
                             }
-                            else if (event.status === 'error') {
+                            else if (event.status === "error") {
                                 this.status = AgentStatus.FAILED;
                                 this.completedAt = event.timestamp ? new Date(event.timestamp) : new Date();
                             }
@@ -650,28 +662,28 @@ export class AgentProcess {
                 catch {
                     // Suppress noisy node-pty AttachConsole stack traces emitted by gemini
                     // helper processes on Windows; they are not actionable errors.
-                    const isGeminiWin32Noise = this.agentType === 'gemini' &&
-                        process.platform === 'win32' &&
-                        (line.includes('AttachConsole failed') ||
-                            line.includes('conpty_console_list_agent') ||
-                            (line.includes('@lydell') && line.includes('node-pty')));
+                    const isGeminiWin32Noise = this.agentType === "gemini" &&
+                        process.platform === "win32" &&
+                        (line.includes("AttachConsole failed") ||
+                            line.includes("conpty_console_list_agent") ||
+                            (line.includes("@lydell") && line.includes("node-pty")));
                     if (!isGeminiWin32Noise) {
                         // Copilot CLI outputs plain text (no JSON mode).
                         // Emit as 'message' events so the summarizer can surface them in status.
-                        if (this.agentType === 'copilot') {
+                        if (this.agentType === "copilot") {
                             this.eventsCache.push({
-                                type: 'message',
-                                agent: 'copilot',
+                                type: "message",
+                                agent: "copilot",
                                 content: line,
                                 complete: true,
-                                timestamp: fallbackTimestamp,
+                                timestamp: fallbackTimestamp
                             });
                         }
                         else {
                             this.eventsCache.push({
-                                type: 'raw',
+                                type: "raw",
                                 content: line,
-                                timestamp: fallbackTimestamp,
+                                timestamp: fallbackTimestamp
                             });
                         }
                     }
@@ -701,15 +713,15 @@ export class AgentProcess {
             session_id: this.sessionId,
             conversation_turn: this.conversationTurn,
             original_agent_id: this.originalAgentId,
-            reply_agent_ids: this.replyAgentIds,
+            reply_agent_ids: this.replyAgentIds
         };
         const metaPath = await this.getMetaPath();
         await fs.writeFile(metaPath, JSON.stringify(meta, null, 2));
     }
     static async loadFromDisk(agentId, baseDir = null) {
-        const base = baseDir || await getAgentsDir();
+        const base = baseDir || (await getAgentsDir());
         const agentDir = path.join(base, agentId);
-        const metaPath = path.join(agentDir, 'meta.json');
+        const metaPath = path.join(agentDir, "meta.json");
         try {
             await fs.access(metaPath);
         }
@@ -717,9 +729,9 @@ export class AgentProcess {
             return null;
         }
         try {
-            const metaContent = await fs.readFile(metaPath, 'utf-8');
+            const metaContent = await fs.readFile(metaPath, "utf-8");
             const meta = JSON.parse(metaContent);
-            const agent = new AgentProcess(meta.agent_id, meta.task_name || 'default', meta.agent_type, meta.prompt, meta.cwd || null, meta.mode === 'edit' ? 'edit' : 'plan', meta.pid || null, AgentStatus[meta.status] || AgentStatus.RUNNING, new Date(meta.started_at), meta.completed_at ? new Date(meta.completed_at) : null, baseDir, meta.parent_session_id || null, meta.workspace_dir || null, meta.session_id || null, meta.conversation_turn || 0, meta.original_agent_id || null, Array.isArray(meta.reply_agent_ids) ? meta.reply_agent_ids : []);
+            const agent = new AgentProcess(meta.agent_id, meta.task_name || "default", meta.agent_type, meta.prompt, meta.cwd || null, meta.mode === "edit" ? "edit" : "plan", meta.pid || null, AgentStatus[meta.status] || AgentStatus.RUNNING, new Date(meta.started_at), meta.completed_at ? new Date(meta.completed_at) : null, baseDir, meta.parent_session_id || null, meta.workspace_dir || null, meta.session_id || null, meta.conversation_turn || 0, meta.original_agent_id || null, Array.isArray(meta.reply_agent_ids) ? meta.reply_agent_ids : []);
             return agent;
         }
         catch {
@@ -786,7 +798,7 @@ export class AgentManager {
     agents = new Map();
     maxAgents;
     maxConcurrent;
-    agentsDir = '';
+    agentsDir = "";
     filterByCwd;
     cleanupAgeDays;
     defaultMode;
@@ -800,7 +812,9 @@ export class AgentManager {
         this.constructorAgentsDir = agentsDir;
         this.filterByCwd = filterByCwd;
         this.cleanupAgeDays = cleanupAgeDays;
-        const resolvedDefaultMode = defaultMode ? normalizeModeValue(defaultMode) : defaultModeFromEnv();
+        const resolvedDefaultMode = defaultMode
+            ? normalizeModeValue(defaultMode)
+            : defaultModeFromEnv();
         if (!resolvedDefaultMode) {
             throw new Error(`Invalid default_mode '${defaultMode}'. Use 'plan' or 'edit'.`);
         }
@@ -818,7 +832,7 @@ export class AgentManager {
         return this.initPromise;
     }
     async doInitialize() {
-        this.agentsDir = this.constructorAgentsDir || await getAgentsDir();
+        this.agentsDir = this.constructorAgentsDir || (await getAgentsDir());
         await fs.mkdir(this.agentsDir, { recursive: true });
         // Set defaults if no config provided
         if (!this.constructorAgentConfigs) {
@@ -889,14 +903,16 @@ export class AgentManager {
         await this.initialize();
         const resolvedMode = resolveMode(mode, this.defaultMode);
         // Use explicit model when provided; otherwise fall back to agent config default
-        const resolvedModel = model?.trim() || this.agentConfigs[agentType]?.models?.default || loadDefaultAgentConfigs()[agentType].models.default;
+        const resolvedModel = model?.trim() ||
+            this.agentConfigs[agentType]?.models?.default ||
+            loadDefaultAgentConfigs()[agentType].models.default;
         const running = await this.listRunning();
         if (running.length >= this.maxConcurrent) {
             throw new Error(`Maximum concurrent agents (${this.maxConcurrent}) reached. Wait for an agent to complete or stop one first.`);
         }
         const [available, pathOrError] = checkCliAvailable(agentType);
         if (!available) {
-            throw new Error(pathOrError || 'CLI tool not available');
+            throw new Error(pathOrError || "CLI tool not available");
         }
         // Resolve and validate cwd
         let resolvedCwd = null;
@@ -921,12 +937,12 @@ export class AgentManager {
             this.agents.delete(agent.agentId);
             throw new Error(`Failed to create agent directory: ${err.message}`);
         }
-        console.error(`Spawning ${agentType} agent ${agentId} [${resolvedMode}]: ${cmd.slice(0, 3).join(' ')}...`);
+        console.error(`Spawning ${agentType} agent ${agentId} [${resolvedMode}]: ${cmd.slice(0, 3).join(" ")}...`);
         try {
             const stdoutPath = await agent.getStdoutPath();
             let spawnCmd;
             let spawnArgs;
-            if (process.platform === 'win32') {
+            if (process.platform === "win32") {
                 // On Windows:
                 // 1. File descriptor inheritance is unreliable for detached processes.
                 // 2. Spawning CLI tools installed in npm global PATH requires a shell.
@@ -939,27 +955,27 @@ export class AgentManager {
                 //
                 const ps1 = buildWindowsSpawnPs1(cmd, stdoutPath, resolvedCwd || process.cwd());
                 const tempScript = path.join(os.tmpdir(), `swarm-agent-${agentId}.ps1`);
-                await fs.writeFile(tempScript, ps1, 'utf-8');
+                await fs.writeFile(tempScript, ps1, "utf-8");
                 // Ensure the output directory exists; the PS1 script creates the file.
                 await fs.mkdir(path.dirname(stdoutPath), { recursive: true });
-                spawnCmd = 'pwsh.exe';
-                spawnArgs = ['-NoProfile', '-NonInteractive', '-File', tempScript];
+                spawnCmd = "pwsh.exe";
+                spawnArgs = ["-NoProfile", "-NonInteractive", "-File", tempScript];
             }
             else {
-                const stdoutFile = await fs.open(stdoutPath, 'w');
+                const stdoutFile = await fs.open(stdoutPath, "w");
                 spawnCmd = cmd[0];
                 spawnArgs = cmd.slice(1);
                 const stdoutFd = stdoutFile.fd;
                 stdoutFile.close().catch(() => { });
                 // Unset CLAUDECODE so agent CLIs can start inside an existing Claude Code session.
                 const childEnv = { ...process.env };
-                delete childEnv['CLAUDECODE'];
+                delete childEnv["CLAUDECODE"];
                 const childProcess = spawn(spawnCmd, spawnArgs, {
-                    stdio: ['ignore', stdoutFd, stdoutFd],
+                    stdio: ["ignore", stdoutFd, stdoutFd],
                     cwd: resolvedCwd || undefined,
                     detached: true,
                     shell: false,
-                    env: childEnv,
+                    env: childEnv
                 });
                 childProcess.unref();
                 agent.pid = childProcess.pid || null;
@@ -972,18 +988,18 @@ export class AgentManager {
             // Unset CLAUDECODE so agent CLIs (especially claude) can start inside an
             // existing Claude Code session without triggering the nested-session guard.
             const childEnv = { ...process.env };
-            delete childEnv['CLAUDECODE'];
+            delete childEnv["CLAUDECODE"];
             // On Windows, pwsh.exe with detached:true + shell:false exits immediately
             // without executing the script (Windows CREATE_NEW_PROCESS_GROUP + pwsh
             // interaction bug). Use detached:false so the script runs correctly.
             // child.unref() still prevents the Node event loop from waiting for it.
-            const isWindowsPs1 = process.platform === 'win32';
+            const isWindowsPs1 = process.platform === "win32";
             const childProcess = spawn(spawnCmd, spawnArgs, {
-                stdio: ['ignore', 'ignore', 'ignore'],
+                stdio: ["ignore", "ignore", "ignore"],
                 cwd: resolvedCwd || undefined,
                 detached: !isWindowsPs1,
                 shell: false,
-                env: childEnv,
+                env: childEnv
             });
             childProcess.unref();
             agent.pid = childProcess.pid || null;
@@ -1000,14 +1016,14 @@ export class AgentManager {
         return agent;
     }
     buildCommand(agentType, prompt, mode, model, cwd = null, reasoningEffort = null) {
-        const isEditMode = mode === 'edit';
+        const isEditMode = mode === "edit";
         // Build the full prompt with prefix (for plan mode) and suffix
         let fullPrompt = prompt + PROMPT_SUFFIX;
         // For Claude in plan mode, add prefix explaining headless plan mode restrictions
-        if (agentType === 'claude' && !isEditMode) {
+        if (agentType === "claude" && !isEditMode) {
             fullPrompt = CLAUDE_PLAN_MODE_PREFIX + fullPrompt;
         }
-        const configAgentCommand = this.agentConfigs?.[agentType]?.command?.trim() ?? '';
+        const configAgentCommand = this.agentConfigs?.[agentType]?.command?.trim() ?? "";
         // Prefer config command when present. This is a *template* override; when the command still
         // targets the known agent CLI (codex/claude/gemini/...), we keep applying the normal
         // post-processing (model injection, mode flags, etc.). If the user points to a different
@@ -1017,84 +1033,84 @@ export class AgentManager {
             : AGENT_COMMANDS[agentType];
         if (!baseTemplate)
             throw new Error(`Unknown agent type: ${agentType}`);
-        const hasPromptPlaceholder = baseTemplate.some(part => part.includes('{prompt}'));
+        const hasPromptPlaceholder = baseTemplate.some((part) => part.includes("{prompt}"));
         if (!hasPromptPlaceholder) {
             throw new Error(`Agent config for '${agentType}' is missing the required {prompt} placeholder in its command. ` +
                 `Config path: ~/.agents/swarm/config.json. ` +
                 `Example fix: "my-cli run '{prompt}' --json"`);
         }
-        let cmd = baseTemplate.map(part => part.replaceAll('{prompt}', fullPrompt));
+        let cmd = baseTemplate.map((part) => part.replaceAll("{prompt}", fullPrompt));
         const isCompatibleCli = isCompatibleAgentCli(agentType, cmd[0]);
         if (!isCompatibleCli) {
             return cmd;
         }
         // For Claude agents, load user's settings.json to inherit permissions
         // and grant access to the working directory
-        if (agentType === 'claude') {
+        if (agentType === "claude") {
             // Ensure required flags for stream-json print mode (older config files may omit these).
-            cmd = ensureClaudeFlag(cmd, '--verbose');
-            cmd = ensureClaudeFlag(cmd, '--permission-mode', 'plan');
-            const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
-            if (!cmd.includes('--settings'))
-                cmd.push('--settings', settingsPath);
+            cmd = ensureClaudeFlag(cmd, "--verbose");
+            cmd = ensureClaudeFlag(cmd, "--permission-mode", "plan");
+            const settingsPath = path.join(os.homedir(), ".claude", "settings.json");
+            if (!cmd.includes("--settings"))
+                cmd.push("--settings", settingsPath);
             if (cwd) {
-                if (!cmd.includes('--add-dir'))
-                    cmd.push('--add-dir', cwd);
+                if (!cmd.includes("--add-dir"))
+                    cmd.push("--add-dir", cwd);
             }
         }
         // For Gemini agents, ensure -p is present so the CLI runs headlessly
         // (without -p the gemini CLI tries to attach to an interactive console).
-        if (agentType === 'gemini') {
+        if (agentType === "gemini") {
             cmd = ensureGeminiHeadlessFlag(cmd, fullPrompt);
         }
         // For Gemini agents in plan mode, add --approval-mode plan to suppress tool
         // execution (e.g. shell calls like `echo OK`), which would otherwise trigger
         // node-pty/ConPTY AttachConsole errors on Windows.
         // Skip if --yolo or --approval-mode is already present in the command.
-        if (agentType === 'gemini' && mode === 'plan') {
-            if (!cmd.includes('--approval-mode') && !cmd.includes('--yolo')) {
-                cmd.push('--approval-mode', 'plan');
+        if (agentType === "gemini" && mode === "plan") {
+            if (!cmd.includes("--approval-mode") && !cmd.includes("--yolo")) {
+                cmd.push("--approval-mode", "plan");
             }
         }
         // Add model flag for each agent type
-        if (cmd.includes('--model')) {
+        if (cmd.includes("--model")) {
             // no-op
         }
-        else if (agentType === 'codex') {
-            const execIndex = cmd.indexOf('exec');
-            const sandboxIndex = cmd.indexOf('--sandbox');
+        else if (agentType === "codex") {
+            const execIndex = cmd.indexOf("exec");
+            const sandboxIndex = cmd.indexOf("--sandbox");
             const insertIndex = sandboxIndex !== -1 ? sandboxIndex : execIndex + 1;
-            cmd.splice(insertIndex, 0, '--model', model);
+            cmd.splice(insertIndex, 0, "--model", model);
         }
-        else if (agentType === 'cursor') {
-            cmd.push('--model', model);
+        else if (agentType === "cursor") {
+            cmd.push("--model", model);
         }
-        else if (agentType === 'gemini' || agentType === 'claude') {
-            cmd.push('--model', model);
+        else if (agentType === "gemini" || agentType === "claude") {
+            cmd.push("--model", model);
         }
-        else if (agentType === 'opencode') {
-            const opencodeAgent = mode === 'edit' || mode === 'ralph' ? 'build' : 'plan';
+        else if (agentType === "opencode") {
+            const opencodeAgent = mode === "edit" || mode === "ralph" ? "build" : "plan";
             // Insert --agent flag after the prompt
             const promptIndex = cmd.indexOf(fullPrompt);
             if (promptIndex !== -1) {
-                cmd.splice(promptIndex + 1, 0, '--agent', opencodeAgent);
+                cmd.splice(promptIndex + 1, 0, "--agent", opencodeAgent);
             }
-            cmd.push('--model', model);
+            cmd.push("--model", model);
         }
-        else if (agentType === 'copilot') {
-            cmd.push('--model', model);
+        else if (agentType === "copilot") {
+            cmd.push("--model", model);
         }
         // Reasoning effort
         if (reasoningEffort) {
-            if (agentType === 'claude') {
-                cmd.push('--effort', reasoningEffort);
+            if (agentType === "claude") {
+                cmd.push("--effort", reasoningEffort);
             }
-            else if (agentType === 'codex') {
-                cmd.push('-c', `model_reasoning_effort="${reasoningEffort}"`);
+            else if (agentType === "codex") {
+                cmd.push("-c", `model_reasoning_effort="${reasoningEffort}"`);
             }
             // gemini, copilot: not supported, ignore silently
         }
-        if (mode === 'ralph') {
+        if (mode === "ralph") {
             cmd = this.applyRalphMode(agentType, cmd);
         }
         else if (isEditMode) {
@@ -1105,24 +1121,24 @@ export class AgentManager {
     applyEditMode(agentType, cmd) {
         const editCmd = [...cmd];
         switch (agentType) {
-            case 'codex':
-                editCmd.push('--full-auto');
+            case "codex":
+                editCmd.push("--full-auto");
                 break;
-            case 'cursor':
-                editCmd.push('-f');
+            case "cursor":
+                editCmd.push("-f");
                 break;
-            case 'gemini':
+            case "gemini":
                 // Gemini CLI uses --yolo flag for auto-approve
-                editCmd.push('--yolo');
+                editCmd.push("--yolo");
                 break;
-            case 'claude':
-                const permModeIndex = editCmd.indexOf('--permission-mode');
+            case "claude":
+                const permModeIndex = editCmd.indexOf("--permission-mode");
                 if (permModeIndex !== -1 && permModeIndex + 1 < editCmd.length) {
-                    editCmd[permModeIndex + 1] = 'acceptEdits';
+                    editCmd[permModeIndex + 1] = "acceptEdits";
                 }
                 break;
-            case 'copilot':
-                editCmd.push('--allow-all-tools', '--allow-all-paths', '--no-ask-user');
+            case "copilot":
+                editCmd.push("--allow-all-tools", "--allow-all-paths", "--no-ask-user");
                 break;
         }
         return editCmd;
@@ -1130,62 +1146,83 @@ export class AgentManager {
     applyRalphMode(agentType, cmd) {
         const ralphCmd = [...cmd];
         switch (agentType) {
-            case 'codex':
-                ralphCmd.push('--full-auto');
+            case "codex":
+                ralphCmd.push("--full-auto");
                 break;
-            case 'cursor':
-                ralphCmd.push('-f');
+            case "cursor":
+                ralphCmd.push("-f");
                 break;
-            case 'gemini':
-                ralphCmd.push('--yolo');
+            case "gemini":
+                ralphCmd.push("--yolo");
                 break;
-            case 'claude':
+            case "claude":
                 // Replace --permission-mode plan with --dangerously-skip-permissions
-                const permModeIndex = ralphCmd.indexOf('--permission-mode');
+                const permModeIndex = ralphCmd.indexOf("--permission-mode");
                 if (permModeIndex !== -1) {
                     ralphCmd.splice(permModeIndex, 2); // Remove --permission-mode and its value
                 }
-                ralphCmd.push('--dangerously-skip-permissions');
+                ralphCmd.push("--dangerously-skip-permissions");
                 break;
-            case 'copilot':
-                ralphCmd.push('--yolo');
+            case "copilot":
+                ralphCmd.push("--yolo");
                 break;
         }
         return ralphCmd;
     }
-    static REPLY_SUPPORTED_AGENTS = new Set(['claude', 'gemini', 'copilot']);
+    static REPLY_SUPPORTED_AGENTS = new Set([
+        "claude",
+        "gemini",
+        "copilot"
+    ]);
     buildReplyCommand(agentType, message, sessionId, mode, model, cwd = null) {
-        const isEditMode = mode === 'edit';
+        const isEditMode = mode === "edit";
         switch (agentType) {
-            case 'claude': {
+            case "claude": {
                 if (!sessionId)
-                    throw new Error('Claude reply requires a session_id');
-                const cmd = ['claude', '-r', sessionId, '-p', message, '--output-format', 'stream-json', '--verbose'];
-                const permMode = isEditMode ? 'acceptEdits' : 'plan';
-                cmd.push('--permission-mode', permMode);
-                const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
-                cmd.push('--settings', settingsPath);
-                cmd.push('--model', model);
+                    throw new Error("Claude reply requires a session_id");
+                const cmd = [
+                    "claude",
+                    "-r",
+                    sessionId,
+                    "-p",
+                    message,
+                    "--output-format",
+                    "stream-json",
+                    "--verbose"
+                ];
+                const permMode = isEditMode ? "acceptEdits" : "plan";
+                cmd.push("--permission-mode", permMode);
+                const settingsPath = path.join(os.homedir(), ".claude", "settings.json");
+                cmd.push("--settings", settingsPath);
+                cmd.push("--model", model);
                 if (cwd)
-                    cmd.push('--add-dir', cwd);
+                    cmd.push("--add-dir", cwd);
                 return cmd;
             }
-            case 'gemini': {
-                const cmd = ['gemini', '--resume', 'latest', '-p', message, '--output-format', 'stream-json'];
-                cmd.push('--model', model);
+            case "gemini": {
+                const cmd = [
+                    "gemini",
+                    "--resume",
+                    "latest",
+                    "-p",
+                    message,
+                    "--output-format",
+                    "stream-json"
+                ];
+                cmd.push("--model", model);
                 if (isEditMode) {
-                    cmd.push('--yolo');
+                    cmd.push("--yolo");
                 }
                 else {
-                    cmd.push('--approval-mode', 'plan');
+                    cmd.push("--approval-mode", "plan");
                 }
                 return cmd;
             }
-            case 'copilot': {
-                const cmd = ['copilot', '--continue', '-p', message, '-s'];
-                cmd.push('--model', model);
+            case "copilot": {
+                const cmd = ["copilot", "--continue", "-p", message, "-s"];
+                cmd.push("--model", model);
                 if (isEditMode) {
-                    cmd.push('--allow-all-tools', '--allow-all-paths', '--no-ask-user');
+                    cmd.push("--allow-all-tools", "--allow-all-paths", "--no-ask-user");
                 }
                 return cmd;
             }
@@ -1202,7 +1239,7 @@ export class AgentManager {
         }
         const agentType = originalAgent.agentType;
         if (!AgentManager.REPLY_SUPPORTED_AGENTS.has(agentType)) {
-            throw new Error(`Reply is not supported for agent type '${agentType}'. Supported: ${[...AgentManager.REPLY_SUPPORTED_AGENTS].join(', ')}`);
+            throw new Error(`Reply is not supported for agent type '${agentType}'. Supported: ${[...AgentManager.REPLY_SUPPORTED_AGENTS].join(", ")}`);
         }
         if (originalAgent.status === AgentStatus.RUNNING) {
             throw new Error(`Cannot reply to agent ${originalAgent.agentId} — it is still running. Wait for it to complete first.`);
@@ -1210,7 +1247,7 @@ export class AgentManager {
         // Ensure events are read so sessionId is populated
         await originalAgent.readNewEvents();
         // For Claude and Gemini, session_id is required; Copilot uses --continue
-        if (agentType !== 'copilot' && !originalAgent.sessionId) {
+        if (agentType !== "copilot" && !originalAgent.sessionId) {
             throw new Error(`Cannot reply to agent ${originalAgent.agentId} — no session_id found. ` +
                 `The agent may not have emitted an init event with a session_id.`);
         }
@@ -1220,9 +1257,11 @@ export class AgentManager {
         }
         const [available, pathOrError] = checkCliAvailable(agentType);
         if (!available) {
-            throw new Error(pathOrError || 'CLI tool not available');
+            throw new Error(pathOrError || "CLI tool not available");
         }
-        const resolvedModel = model?.trim() || this.agentConfigs[agentType]?.models?.default || loadDefaultAgentConfigs()[agentType].models.default;
+        const resolvedModel = model?.trim() ||
+            this.agentConfigs[agentType]?.models?.default ||
+            loadDefaultAgentConfigs()[agentType].models.default;
         const resolvedMode = originalAgent.mode;
         const conversationTurn = originalAgent.conversationTurn + 1;
         const cmd = this.buildReplyCommand(agentType, message, originalAgent.sessionId, resolvedMode, resolvedModel, originalAgent.cwd);
@@ -1236,33 +1275,33 @@ export class AgentManager {
             this.agents.delete(agent.agentId);
             throw new Error(`Failed to create agent directory: ${err.message}`);
         }
-        console.error(`Spawning reply ${agentType} agent ${agentId} (turn ${conversationTurn}): ${cmd.slice(0, 3).join(' ')}...`);
+        console.error(`Spawning reply ${agentType} agent ${agentId} (turn ${conversationTurn}): ${cmd.slice(0, 3).join(" ")}...`);
         try {
             const stdoutPath = await agent.getStdoutPath();
             let spawnCmd;
             let spawnArgs;
-            if (process.platform === 'win32') {
+            if (process.platform === "win32") {
                 const ps1 = buildWindowsSpawnPs1(cmd, stdoutPath, originalAgent.cwd || process.cwd());
                 const tempScript = path.join(os.tmpdir(), `swarm-agent-${agentId}.ps1`);
-                await fs.writeFile(tempScript, ps1, 'utf-8');
+                await fs.writeFile(tempScript, ps1, "utf-8");
                 await fs.mkdir(path.dirname(stdoutPath), { recursive: true });
-                spawnCmd = 'pwsh.exe';
-                spawnArgs = ['-NoProfile', '-NonInteractive', '-File', tempScript];
+                spawnCmd = "pwsh.exe";
+                spawnArgs = ["-NoProfile", "-NonInteractive", "-File", tempScript];
             }
             else {
-                const stdoutFile = await fs.open(stdoutPath, 'w');
+                const stdoutFile = await fs.open(stdoutPath, "w");
                 spawnCmd = cmd[0];
                 spawnArgs = cmd.slice(1);
                 const stdoutFd = stdoutFile.fd;
                 stdoutFile.close().catch(() => { });
                 const childEnv = { ...process.env };
-                delete childEnv['CLAUDECODE'];
+                delete childEnv["CLAUDECODE"];
                 const childProcess = spawn(spawnCmd, spawnArgs, {
-                    stdio: ['ignore', stdoutFd, stdoutFd],
+                    stdio: ["ignore", stdoutFd, stdoutFd],
                     cwd: originalAgent.cwd || undefined,
                     detached: true,
                     shell: false,
-                    env: childEnv,
+                    env: childEnv
                 });
                 childProcess.unref();
                 agent.pid = childProcess.pid || null;
@@ -1276,14 +1315,14 @@ export class AgentManager {
                 return agent;
             }
             const childEnv = { ...process.env };
-            delete childEnv['CLAUDECODE'];
-            const isWindowsPs1 = process.platform === 'win32';
+            delete childEnv["CLAUDECODE"];
+            const isWindowsPs1 = process.platform === "win32";
             const childProcess = spawn(spawnCmd, spawnArgs, {
-                stdio: ['ignore', 'ignore', 'ignore'],
+                stdio: ["ignore", "ignore", "ignore"],
                 cwd: originalAgent.cwd || undefined,
                 detached: !isWindowsPs1,
                 shell: false,
-                env: childEnv,
+                env: childEnv
             });
             childProcess.unref();
             agent.pid = childProcess.pid || null;
@@ -1329,19 +1368,19 @@ export class AgentManager {
     }
     async listRunning() {
         const all = await this.listAll();
-        return all.filter(a => a.status === AgentStatus.RUNNING);
+        return all.filter((a) => a.status === AgentStatus.RUNNING);
     }
     async listCompleted() {
         const all = await this.listAll();
-        return all.filter(a => a.status !== AgentStatus.RUNNING);
+        return all.filter((a) => a.status !== AgentStatus.RUNNING);
     }
     async listByTask(taskName) {
         const all = await this.listAll();
-        return all.filter(a => a.taskName === taskName);
+        return all.filter((a) => a.taskName === taskName);
     }
     async listByParentSession(parentSessionId) {
         const all = await this.listAll();
-        return all.filter(a => a.parentSessionId === parentSessionId);
+        return all.filter((a) => a.parentSessionId === parentSessionId);
     }
     async stopByTask(taskName) {
         const agents = await this.listByTask(taskName);
@@ -1368,16 +1407,15 @@ export class AgentManager {
         }
         if (agent.pid && agent.status === AgentStatus.RUNNING) {
             try {
-                process.kill(-agent.pid, 'SIGTERM');
+                process.kill(-agent.pid, "SIGTERM");
                 console.error(`Sent SIGTERM to agent ${agentId} (PID ${agent.pid})`);
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                await new Promise((resolve) => setTimeout(resolve, 2000));
                 if (agent.isProcessAlive()) {
-                    process.kill(-agent.pid, 'SIGKILL');
+                    process.kill(-agent.pid, "SIGKILL");
                     console.error(`Sent SIGKILL to agent ${agentId}`);
                 }
             }
-            catch {
-            }
+            catch { }
             agent.status = AgentStatus.STOPPED;
             agent.completedAt = new Date();
             await agent.saveMeta();

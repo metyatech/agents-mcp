@@ -1,31 +1,31 @@
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
   InitializeRequestSchema,
-  ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
-import { AgentManager, checkAllClis } from './agents.js';
-import { AgentType } from './parsers.js';
-import { handleSpawn, handleStatus, handleStop, handleTasks, handleReply } from './api.js';
-import { readConfig, type AgentConfig } from './persistence.js';
+  ListToolsRequestSchema
+} from "@modelcontextprotocol/sdk/types.js";
+import { AgentManager, checkAllClis } from "./agents.js";
+import { AgentType } from "./parsers.js";
+import { handleSpawn, handleStatus, handleStop, handleTasks, handleReply } from "./api.js";
+import { readConfig, type AgentConfig } from "./persistence.js";
 import {
   buildVersionNotice,
   detectClientFromName,
   getCurrentVersion,
   initVersionCheck,
-  setDetectedClient,
-} from './version.js';
+  setDetectedClient
+} from "./version.js";
 
 let agentConfigs: Record<AgentType, AgentConfig> | null = null;
 const manager = new AgentManager(50, 10, null, null, null, 7, agentConfigs);
 
 const TOOL_NAMES = {
-  spawn: 'Spawn',
-  status: 'Status',
-  stop: 'Stop',
-  tasks: 'Tasks',
-  reply: 'Reply',
+  spawn: "Spawn",
+  status: "Status",
+  stop: "Stop",
+  tasks: "Tasks",
+  reply: "Reply"
 } as const;
 
 export function getParentSessionIdFromEnv(): string | null {
@@ -47,12 +47,12 @@ let enabledAgents: AgentType[] = [];
 
 // Agent descriptions for dynamic tool description
 const agentDescriptions: Record<AgentType, string> = {
-  cursor: 'Debugging, bug fixes, tracing through codebases.',
-  codex: 'Fast, cheap. Self-contained features, clean implementations.',
-  claude: 'Maximum capability, research, exploration.',
-  gemini: 'Complex multi-system features, architectural changes.',
-  opencode: 'Open source coding agent. Provider-agnostic, TUI-focused.',
-  copilot: 'GitHub Copilot CLI. General-purpose coding agent with GitHub integration.',
+  cursor: "Debugging, bug fixes, tracing through codebases.",
+  codex: "Fast, cheap. Self-contained features, clean implementations.",
+  claude: "Maximum capability, research, exploration.",
+  gemini: "Complex multi-system features, architectural changes.",
+  opencode: "Open source coding agent. Provider-agnostic, TUI-focused.",
+  copilot: "GitHub Copilot CLI. General-purpose coding agent with GitHub integration."
 };
 
 function withVersionNotice(description: string): string {
@@ -62,7 +62,7 @@ function withVersionNotice(description: string): string {
 function buildSpawnDescription(): string {
   const agentList = enabledAgents
     .map((agent, i) => `${i + 1}. ${agent} - ${agentDescriptions[agent]}`)
-    .join('\n');
+    .join("\n");
 
   return `Spawn an AI coding agent to work on a task.
 
@@ -91,13 +91,13 @@ Choose automatically based on task requirements - don't ask the user.`;
 
 const server = new Server(
   {
-    name: 'Swarm',
-    version: getCurrentVersion(),
+    name: "Swarm",
+    version: getCurrentVersion()
   },
   {
     capabilities: {
-      tools: {},
-    },
+      tools: {}
+    }
   }
 );
 
@@ -109,14 +109,14 @@ server.setRequestHandler(InitializeRequestSchema, async (request) => {
   }
   // Return standard initialize response
   return {
-    protocolVersion: '2024-11-05',
+    protocolVersion: "2024-11-05",
     capabilities: {
-      tools: {},
+      tools: {}
     },
     serverInfo: {
-      name: 'Swarm',
-      version: getCurrentVersion(),
-    },
+      name: "Swarm",
+      version: getCurrentVersion()
+    }
   };
 });
 
@@ -127,45 +127,49 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         name: TOOL_NAMES.spawn,
         description: withVersionNotice(buildSpawnDescription()),
         inputSchema: {
-          type: 'object',
+          type: "object",
           properties: {
             task_name: {
-              type: 'string',
-              description: 'Task name to group related agents (e.g., "auth-feature", "bug-fix-123")',
+              type: "string",
+              description: 'Task name to group related agents (e.g., "auth-feature", "bug-fix-123")'
             },
             agent_type: {
-              type: 'string',
+              type: "string",
               enum: enabledAgents,
-              description: 'Type of agent to spawn',
+              description: "Type of agent to spawn"
             },
             prompt: {
-              type: 'string',
-              description: 'The task/prompt for the agent',
+              type: "string",
+              description: "The task/prompt for the agent"
             },
             cwd: {
-              type: 'string',
-              description: 'Working directory for the agent (optional)',
+              type: "string",
+              description: "Working directory for the agent (optional)"
             },
             mode: {
-              type: 'string',
-              enum: ['plan', 'edit', 'ralph'],
-              description: "'edit' allows file modifications, 'plan' is read-only (default), 'ralph' is autonomous execution through RALPH.md tasks.",
+              type: "string",
+              enum: ["plan", "edit", "ralph"],
+              description:
+                "'edit' allows file modifications, 'plan' is read-only (default), 'ralph' is autonomous execution through RALPH.md tasks."
             },
             effort: {
-              type: 'string',
-              description: "Reasoning effort level passed to the agent CLI. For Claude: --effort <value> (e.g. low/medium/high). For Codex: -c model_reasoning_effort=\"<value>\". Gemini and Copilot do not support this and will ignore it.",
+              type: "string",
+              description:
+                'Reasoning effort level passed to the agent CLI. For Claude: --effort <value> (e.g. low/medium/high). For Codex: -c model_reasoning_effort="<value>". Gemini and Copilot do not support this and will ignore it.'
             },
             model: {
-              type: 'string',
-              description: "Optional model override. When specified, takes precedence over 'effort'. Examples: 'claude-sonnet-4-6', 'gpt-5.2-codex', 'gemini-3-pro-preview'.",
-            },
+              type: "string",
+              description:
+                "Optional model override. When specified, takes precedence over 'effort'. Examples: 'claude-sonnet-4-6', 'gpt-5.2-codex', 'gemini-3-pro-preview'."
+            }
           },
-          required: ['task_name', 'agent_type', 'prompt'],
-        },
+          required: ["task_name", "agent_type", "prompt"]
+        }
       },
       {
         name: TOOL_NAMES.status,
-        description: withVersionNotice(`Get status of all agents in a task with full details including:
+        description:
+          withVersionNotice(`Get status of all agents in a task with full details including:
 - Files created/modified/read/deleted (full paths)
 - All bash commands executed
 - Last 3 assistant messages
@@ -174,36 +178,40 @@ Use this for polling agent progress.
 
 CURSOR SUPPORT: Send 'since' parameter (ISO timestamp from previous response's 'cursor' field) to get only NEW data since that time. This avoids duplicate data on repeated polls.`),
         inputSchema: {
-          type: 'object',
+          type: "object",
           properties: {
             task_name: {
-              type: 'string',
-              description: 'Task name to get status for',
+              type: "string",
+              description: "Task name to get status for"
             },
             parent_session_id: {
-              type: 'string',
-              description: 'Filter agents by the session that spawned them (alternative to task_name)',
+              type: "string",
+              description:
+                "Filter agents by the session that spawned them (alternative to task_name)"
             },
             filter: {
-              type: 'string',
-              enum: ['running', 'completed', 'failed', 'stopped', 'all'],
-              description: "Filter agents by status. Defaults to 'all'.",
+              type: "string",
+              enum: ["running", "completed", "failed", "stopped", "all"],
+              description: "Filter agents by status. Defaults to 'all'."
             },
             since: {
-              type: 'string',
-              description: 'Optional ISO timestamp - return only events after this time. Use cursor from previous response to get delta updates.',
+              type: "string",
+              description:
+                "Optional ISO timestamp - return only events after this time. Use cursor from previous response to get delta updates."
             },
             wait: {
-              type: 'boolean',
-              description: 'Block until all agents in the task are no longer running, or timeout is reached.',
+              type: "boolean",
+              description:
+                "Block until all agents in the task are no longer running, or timeout is reached."
             },
             timeout: {
-              type: 'number',
-              description: 'Max wait time in milliseconds when wait=true. Defaults to 60000 (60s). Max 600000 (10min).',
-            },
+              type: "number",
+              description:
+                "Max wait time in milliseconds when wait=true. Defaults to 60000 (60s). Max 600000 (10min)."
+            }
           },
-          required: ['task_name'],
-        },
+          required: ["task_name"]
+        }
       },
       {
         name: TOOL_NAMES.stop,
@@ -211,19 +219,19 @@ CURSOR SUPPORT: Send 'since' parameter (ISO timestamp from previous response's '
 - Stop(task_name): Stop ALL agents in the task
 - Stop(task_name, agent_id): Stop ONE specific agent`),
         inputSchema: {
-          type: 'object',
+          type: "object",
           properties: {
             task_name: {
-              type: 'string',
-              description: 'Task name',
+              type: "string",
+              description: "Task name"
             },
             agent_id: {
-              type: 'string',
-              description: 'Optional: specific agent ID to stop (omit to stop all in task)',
-            },
+              type: "string",
+              description: "Optional: specific agent ID to stop (omit to stop all in task)"
+            }
           },
-          required: ['task_name'],
-        },
+          required: ["task_name"]
+        }
       },
       {
         name: TOOL_NAMES.tasks,
@@ -235,19 +243,20 @@ Returns tasks sorted by most recent activity, with full agent details including:
 - Last messages from each agent
 - Status and duration`),
         inputSchema: {
-          type: 'object',
+          type: "object",
           properties: {
             limit: {
-              type: 'number',
-              description: 'Maximum number of tasks to return (optional, defaults to 10)',
-            },
+              type: "number",
+              description: "Maximum number of tasks to return (optional, defaults to 10)"
+            }
           },
-          required: [],
-        },
+          required: []
+        }
       },
       {
         name: TOOL_NAMES.reply,
-        description: withVersionNotice(`Send a follow-up message to a completed agent, resuming its conversation with full context.
+        description:
+          withVersionNotice(`Send a follow-up message to a completed agent, resuming its conversation with full context.
 
 Supported agents: claude, gemini, copilot. Codex, cursor, and opencode do not support reply.
 
@@ -259,21 +268,21 @@ Usage flow:
 
 The reply agent inherits the original agent's task name, mode, and working directory. Each reply increments the conversation_turn counter. Status output includes conversation metadata (session_id, conversation_turn, original_agent_id, reply_agent_ids).`),
         inputSchema: {
-          type: 'object',
+          type: "object",
           properties: {
             agent_id: {
-              type: 'string',
-              description: 'The agent ID to reply to (must be completed, not running)',
+              type: "string",
+              description: "The agent ID to reply to (must be completed, not running)"
             },
             message: {
-              type: 'string',
-              description: 'The follow-up message to send to the agent',
-            },
+              type: "string",
+              description: "The follow-up message to send to the agent"
+            }
           },
-          required: ['agent_id', 'message'],
-        },
-      },
-    ],
+          required: ["agent_id", "message"]
+        }
+      }
+    ]
   };
 });
 
@@ -284,9 +293,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     let result: any;
 
-    if (normalizedName === 'spawn') {
+    if (normalizedName === "spawn") {
       if (!args) {
-        throw new Error('Missing arguments for spawn');
+        throw new Error("Missing arguments for spawn");
       }
       const parentSessionId = getParentSessionIdFromEnv();
       const workspaceDir = getWorkspaceFromEnv();
@@ -302,9 +311,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         (args.model as string) || null,
         (args.effort as string) || null
       );
-    } else if (normalizedName === 'status') {
+    } else if (normalizedName === "status") {
       if (!args) {
-        throw new Error('Missing arguments for status');
+        throw new Error("Missing arguments for status");
       }
       result = await handleStatus(
         manager,
@@ -315,27 +324,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         args.wait as boolean | undefined,
         args.timeout as number | undefined
       );
-    } else if (normalizedName === 'stop') {
+    } else if (normalizedName === "stop") {
       if (!args) {
-        throw new Error('Missing arguments for stop');
+        throw new Error("Missing arguments for stop");
       }
       result = await handleStop(
         manager,
         args.task_name as string,
         args.agent_id as string | undefined
       );
-    } else if (normalizedName === 'tasks') {
+    } else if (normalizedName === "tasks") {
       const limit = args?.limit as number | undefined;
       result = await handleTasks(manager, limit || 10);
-    } else if (normalizedName === 'reply') {
+    } else if (normalizedName === "reply") {
       if (!args) {
-        throw new Error('Missing arguments for reply');
+        throw new Error("Missing arguments for reply");
       }
-      result = await handleReply(
-        manager,
-        args.agent_id as string,
-        args.message as string
-      );
+      result = await handleReply(manager, args.agent_id as string, args.message as string);
     } else {
       result = { error: `Unknown tool: ${name}` };
     }
@@ -343,10 +348,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return {
       content: [
         {
-          type: 'text',
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }
+      ]
     };
   } catch (err: any) {
     console.error(`Error in tool ${name}:`, err);
@@ -355,19 +360,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return {
         content: [
           {
-            type: 'text',
-            text: JSON.stringify(payload, null, 2),
-          },
-        ],
+            type: "text",
+            text: JSON.stringify(payload, null, 2)
+          }
+        ]
       };
     }
     return {
       content: [
         {
-          type: 'text',
-          text: JSON.stringify({ error: String(err) }, null, 2),
-        },
-      ],
+          type: "text",
+          text: JSON.stringify({ error: String(err) }, null, 2)
+        }
+      ]
     };
   }
 });
@@ -385,11 +390,11 @@ export async function runServer(): Promise<void> {
   // Installed = enabled. If the CLI is on PATH, the agent is available.
   enabledAgents = installedAgents;
 
-  console.error('Enabled agents (installed):', enabledAgents.join(', ') || 'none');
+  console.error("Enabled agents (installed):", enabledAgents.join(", ") || "none");
 
   // Initialize version check (non-blocking, with timeout)
-  initVersionCheck().catch(err => {
-    console.warn('[Swarm] Version check failed:', err);
+  initVersionCheck().catch((err) => {
+    console.warn("[Swarm] Version check failed:", err);
   });
 
   const transport = new StdioServerTransport();
@@ -405,9 +410,8 @@ export async function runServer(): Promise<void> {
     .filter(([_, status]) => !status.installed)
     .map(([agent]) => agent);
 
-  console.error('Available agents:', available.join(', '));
+  console.error("Available agents:", available.join(", "));
   if (missing.length > 0) {
-    console.error('Missing agents (install CLIs to use):', missing.join(', '));
+    console.error("Missing agents (install CLIs to use):", missing.join(", "));
   }
-
 }

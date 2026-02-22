@@ -29,7 +29,7 @@ export declare class AgentSummary {
     lastActivity: string | null;
     eventsCache: any[];
     constructor(agentId: string, agentType: string, status: string, duration?: string | null, eventCount?: number);
-    toDict(detailLevel?: 'brief' | 'standard' | 'detailed'): any;
+    toDict(detailLevel?: "brief" | "standard" | "detailed"): any;
     private truncate;
 }
 export declare function summarizeEvents(agentId: string, agentType: string, status: string, events: any[], duration?: string | null): AgentSummary;

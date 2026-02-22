@@ -1,5 +1,5 @@
-import { AgentManager } from './agents.js';
-import { AgentType } from './parsers.js';
+import { AgentManager } from "./agents.js";
+import { AgentType } from "./parsers.js";
 export interface SpawnResult {
     task_name: string;
     agent_id: string;

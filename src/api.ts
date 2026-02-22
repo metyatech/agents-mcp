@@ -2,13 +2,13 @@
  * Testable API handlers for the agent-swarm MCP server.
  * These functions can be called directly in tests with a custom AgentManager.
  */
-import * as path from 'path';
-import * as fs from 'fs/promises';
+import * as path from "path";
+import * as fs from "fs/promises";
 
-import { AgentManager, AgentStatus, resolveMode } from './agents.js';
-import { AgentType } from './parsers.js';
-import { getDelta, getErrorSnippets } from './summarizer.js';
-import { readConfig } from './persistence.js';
+import { AgentManager, AgentStatus, resolveMode } from "./agents.js";
+import { AgentType } from "./parsers.js";
+import { getDelta, getErrorSnippets } from "./summarizer.js";
+import { readConfig } from "./persistence.js";
 
 /**
  * Truncate a bash command for status output.
@@ -23,7 +23,7 @@ function truncateBashCommand(cmd: string, maxLen: number = 120): string {
 
   // For regular commands, just truncate
   if (cmd.length <= maxLen) return cmd;
-  return cmd.substring(0, maxLen - 3) + '...';
+  return cmd.substring(0, maxLen - 3) + "...";
 }
 
 export interface SpawnResult {
@@ -63,7 +63,7 @@ export interface AgentStatusDetail {
     log_tail: string[];
     tail_errors: string[];
   };
-  cursor: string;  // ISO timestamp - send back in next request for delta
+  cursor: string; // ISO timestamp - send back in next request for delta
   conversation_turn?: number;
   original_agent_id?: string | null;
   reply_agent_ids?: string[];
@@ -74,7 +74,7 @@ export interface TaskStatusResult {
   task_name: string;
   agents: AgentStatusDetail[];
   summary: { running: number; completed: number; failed: number; stopped: number };
-  cursor: string;  // ISO timestamp - max across all agents
+  cursor: string; // ISO timestamp - max across all agents
   timed_out?: boolean;
 }
 
@@ -93,8 +93,8 @@ export interface TaskInfo {
   failed: number;
   stopped: number;
   workspace_dir: string | null;
-  created_at: string;   // Earliest agent start time
-  modified_at: string;  // Latest agent activity (completion or current time if running)
+  created_at: string; // Earliest agent start time
+  modified_at: string; // Latest agent activity (completion or current time if running)
 }
 
 export interface TasksResult {
@@ -111,11 +111,11 @@ async function readTailLines(
 
   const toRead = Math.min(stats.size, maxBytes);
   const startPos = Math.max(0, stats.size - toRead);
-  const fd = await fs.open(filePath, 'r');
+  const fd = await fs.open(filePath, "r");
   try {
     const buffer = Buffer.alloc(toRead);
     const { bytesRead } = await fd.read(buffer, 0, toRead, startPos);
-    const text = buffer.toString('utf-8', 0, bytesRead);
+    const text = buffer.toString("utf-8", 0, bytesRead);
     const lines = text.split(/\r?\n/);
     return lines.slice(-maxLines).filter((l) => l.trim().length > 0);
   } finally {
@@ -124,7 +124,18 @@ async function readTailLines(
 }
 
 function extractErrorLinesFromTail(lines: string[], maxItems: number = 3): string[] {
-  const keywords = ['error', 'failed', 'exception', 'denied', 'quota', 'rate limit', '429', '403', '401', 'policy'];
+  const keywords = [
+    "error",
+    "failed",
+    "exception",
+    "denied",
+    "quota",
+    "rate limit",
+    "429",
+    "403",
+    "401",
+    "policy"
+  ];
   const matches = lines.filter((line) => {
     const lower = line.toLowerCase();
     return keywords.some((k) => lower.includes(k));
@@ -148,23 +159,25 @@ export async function handleSpawn(
   const resolvedMode = resolveMode(mode, defaultMode);
 
   console.error(
-    `[spawn] Spawning ${agentType} agent for task "${taskName}" [${resolvedMode}]${effort ? ` effort=${effort}` : ''}${model ? ` model=${model}` : ''}...`
+    `[spawn] Spawning ${agentType} agent for task "${taskName}" [${resolvedMode}]${effort ? ` effort=${effort}` : ""}${model ? ` model=${model}` : ""}...`
   );
 
   // Ralph mode special handling
-  if (resolvedMode === 'ralph') {
+  if (resolvedMode === "ralph") {
     if (!cwd) {
-      throw new Error('Ralph mode requires a cwd parameter');
+      throw new Error("Ralph mode requires a cwd parameter");
     }
 
     // Import ralph utilities
-    const { isDangerousPath, getRalphConfig, buildRalphPrompt } = await import('./ralph.js');
+    const { isDangerousPath, getRalphConfig, buildRalphPrompt } = await import("./ralph.js");
 
     const resolvedCwd = path.resolve(cwd);
 
     // Safety check
     if (isDangerousPath(resolvedCwd)) {
-      throw new Error('⚠️ Ralph mode in home or system directory is risky. Use a project directory.');
+      throw new Error(
+        "⚠️ Ralph mode in home or system directory is risky. Use a project directory."
+      );
     }
 
     // Check RALPH.md exists
@@ -200,7 +213,7 @@ export async function handleSpawn(
       agent_id: agent.agentId,
       agent_type: agent.agentType,
       status: agent.status,
-      started_at: agent.startedAt.toISOString(),
+      started_at: agent.startedAt.toISOString()
     };
   }
 
@@ -225,7 +238,7 @@ export async function handleSpawn(
     agent_id: agent.agentId,
     agent_type: agent.agentType,
     status: agent.status,
-    started_at: agent.startedAt.toISOString(),
+    started_at: agent.startedAt.toISOString()
   };
 }
 
@@ -234,16 +247,16 @@ async function collectStatus(
   normalizedTaskName: string,
   normalizedParentSessionId: string,
   effectiveFilter: string,
-  since?: string,
+  since?: string
 ): Promise<TaskStatusResult> {
-  const allAgents = normalizedParentSessionId && !normalizedTaskName
-    ? await manager.listByParentSession(normalizedParentSessionId)
-    : await manager.listByTask(normalizedTaskName);
+  const allAgents =
+    normalizedParentSessionId && !normalizedTaskName
+      ? await manager.listByParentSession(normalizedParentSessionId)
+      : await manager.listByTask(normalizedTaskName);
 
   // Filter agents by status ('all' shows everything)
-  const agents = effectiveFilter === 'all'
-    ? allAgents
-    : allAgents.filter((a) => a.status === effectiveFilter);
+  const agents =
+    effectiveFilter === "all" ? allAgents : allAgents.filter((a) => a.status === effectiveFilter);
 
   const agentStatuses: AgentStatusDetail[] = [];
   const counts = { running: 0, completed: 0, failed: 0, stopped: 0 };
@@ -257,20 +270,14 @@ async function collectStatus(
   }
 
   // Build details only for filtered agents
-  let maxTimestamp = since || new Date(0).toISOString();  // Track max timestamp for cursor
+  let maxTimestamp = since || new Date(0).toISOString(); // Track max timestamp for cursor
 
   for (const agent of agents) {
     await agent.readNewEvents();
     const events = agent.events;
 
     // Use getDelta to filter events by timestamp (or get all if no since)
-    const delta = getDelta(
-      agent.agentId,
-      agent.agentType,
-      agent.status,
-      events,
-      since
-    );
+    const delta = getDelta(agent.agentId, agent.agentType, agent.status, events, since);
 
     // Find latest timestamp from this agent's events
     const latestEvent = events[events.length - 1];
@@ -286,20 +293,23 @@ async function collectStatus(
       agent.status === AgentStatus.FAILED
         ? (() => {
             const agentDir = path.join(manager.getAgentsDirPath(), agent.agentId);
-            const stdoutPath = path.join(agentDir, 'stdout.log');
-            const metaPath = path.join(agentDir, 'meta.json');
+            const stdoutPath = path.join(agentDir, "stdout.log");
+            const metaPath = path.join(agentDir, "meta.json");
             return { agentDir, stdoutPath, metaPath };
           })()
         : null;
 
-    const diagPayload =
-      diagnostics
-        ? {
-            log_paths: { agent_dir: diagnostics.agentDir, stdout: diagnostics.stdoutPath, meta: diagnostics.metaPath },
-            log_tail: await readTailLines(diagnostics.stdoutPath),
-            tail_errors: [] as string[],
-          }
-        : undefined;
+    const diagPayload = diagnostics
+      ? {
+          log_paths: {
+            agent_dir: diagnostics.agentDir,
+            stdout: diagnostics.stdoutPath,
+            meta: diagnostics.metaPath
+          },
+          log_tail: await readTailLines(diagnostics.stdoutPath),
+          tail_errors: [] as string[]
+        }
+      : undefined;
 
     if (diagPayload) {
       diagPayload.tail_errors = extractErrorLinesFromTail(diagPayload.log_tail, 3);
@@ -320,11 +330,11 @@ async function collectStatus(
       has_errors: hasErrors,
       errors,
       diagnostics: diagPayload,
-      cursor: agentTimestamp,  // Return latest timestamp for this agent
+      cursor: agentTimestamp, // Return latest timestamp for this agent
       conversation_turn: agent.conversationTurn,
       original_agent_id: agent.originalAgentId,
       reply_agent_ids: agent.replyAgentIds,
-      session_id: agent.sessionId,
+      session_id: agent.sessionId
     });
   }
 
@@ -332,7 +342,7 @@ async function collectStatus(
     task_name: normalizedTaskName,
     agents: agentStatuses,
     summary: counts,
-    cursor: maxTimestamp,
+    cursor: maxTimestamp
   };
 }
 
@@ -344,27 +354,36 @@ export async function handleStatus(
   manager: AgentManager,
   taskName: string | null | undefined,
   filter?: string,
-  since?: string,  // Optional ISO timestamp - return only events after this time
+  since?: string, // Optional ISO timestamp - return only events after this time
   parentSessionId?: string | null,
   wait?: boolean,
-  timeout?: number,
+  timeout?: number
 ): Promise<TaskStatusResult> {
   // Default to 'all' so callers see completed/failed agents unless they opt to filter
-  const effectiveFilter = filter || 'all';
-  const normalizedTaskName = taskName?.trim() || '';
-  const normalizedParentSessionId = parentSessionId?.trim() || '';
+  const effectiveFilter = filter || "all";
+  const normalizedTaskName = taskName?.trim() || "";
+  const normalizedParentSessionId = parentSessionId?.trim() || "";
 
   if (!normalizedTaskName && !normalizedParentSessionId) {
-    throw new Error('task_name is required when parent_session_id is not provided');
+    throw new Error("task_name is required when parent_session_id is not provided");
   }
 
-  const lookupLabel = normalizedParentSessionId && !normalizedTaskName
-    ? `parent_session_id "${normalizedParentSessionId}"`
-    : `task "${normalizedTaskName}"`;
+  const lookupLabel =
+    normalizedParentSessionId && !normalizedTaskName
+      ? `parent_session_id "${normalizedParentSessionId}"`
+      : `task "${normalizedTaskName}"`;
 
-  console.error(`[status] Getting status for agents in ${lookupLabel} (filter=${effectiveFilter}${wait ? `, wait=true, timeout=${timeout ?? WAIT_DEFAULT_TIMEOUT_MS}ms` : ''})...`);
+  console.error(
+    `[status] Getting status for agents in ${lookupLabel} (filter=${effectiveFilter}${wait ? `, wait=true, timeout=${timeout ?? WAIT_DEFAULT_TIMEOUT_MS}ms` : ""})...`
+  );
 
-  let result = await collectStatus(manager, normalizedTaskName, normalizedParentSessionId, effectiveFilter, since);
+  let result = await collectStatus(
+    manager,
+    normalizedTaskName,
+    normalizedParentSessionId,
+    effectiveFilter,
+    since
+  );
 
   if (wait && result.summary.running > 0) {
     const effectiveTimeout = Math.min(timeout ?? WAIT_DEFAULT_TIMEOUT_MS, WAIT_MAX_TIMEOUT_MS);
@@ -373,27 +392,34 @@ export async function handleStatus(
     console.error(`[status] Waiting for running agents (deadline in ${effectiveTimeout}ms)...`);
 
     while (result.summary.running > 0 && Date.now() < deadline) {
-      await new Promise(resolve => setTimeout(resolve, WAIT_POLL_INTERVAL_MS));
-      result = await collectStatus(manager, normalizedTaskName, normalizedParentSessionId, effectiveFilter, since);
+      await new Promise((resolve) => setTimeout(resolve, WAIT_POLL_INTERVAL_MS));
+      result = await collectStatus(
+        manager,
+        normalizedTaskName,
+        normalizedParentSessionId,
+        effectiveFilter,
+        since
+      );
     }
 
     if (result.summary.running > 0) {
-      console.error(`[status] Wait timed out after ${effectiveTimeout}ms with ${result.summary.running} agent(s) still running`);
+      console.error(
+        `[status] Wait timed out after ${effectiveTimeout}ms with ${result.summary.running} agent(s) still running`
+      );
       result.timed_out = true;
     } else {
       console.error(`[status] All agents finished within wait period`);
     }
   }
 
-  console.error(`[status] ${lookupLabel}: returning ${result.agents.length} agents (running=${result.summary.running}, completed=${result.summary.completed}, failed=${result.summary.failed}, stopped=${result.summary.stopped})`);
+  console.error(
+    `[status] ${lookupLabel}: returning ${result.agents.length} agents (running=${result.summary.running}, completed=${result.summary.completed}, failed=${result.summary.failed}, stopped=${result.summary.stopped})`
+  );
 
   return result;
 }
 
-export async function handleTasks(
-  manager: AgentManager,
-  limit: number = 10
-): Promise<TasksResult> {
+export async function handleTasks(manager: AgentManager, limit: number = 10): Promise<TasksResult> {
   console.error(`[tasks] Listing tasks (limit=${limit})...`);
 
   const allAgents = await manager.listAll();
@@ -409,7 +435,10 @@ export async function handleTasks(
   const tasks: TaskInfo[] = [];
 
   for (const [taskName, agents] of taskMap) {
-    let running = 0, completed = 0, failed = 0, stopped = 0;
+    let running = 0,
+      completed = 0,
+      failed = 0,
+      stopped = 0;
     let earliestStart: Date | null = null;
     let latestActivity: Date | null = null;
     let workspaceDir: string | null = null;
@@ -428,9 +457,8 @@ export async function handleTasks(
 
       // Track latest activity (modified_at)
       // For running agents, use current time; for others use completedAt or startedAt
-      const activityTime = agent.status === AgentStatus.RUNNING
-        ? new Date()
-        : (agent.completedAt || agent.startedAt);
+      const activityTime =
+        agent.status === AgentStatus.RUNNING ? new Date() : agent.completedAt || agent.startedAt;
       if (!latestActivity || activityTime > latestActivity) {
         latestActivity = activityTime;
       }
@@ -450,7 +478,7 @@ export async function handleTasks(
       stopped,
       workspace_dir: workspaceDir,
       created_at: earliestStart?.toISOString() || new Date().toISOString(),
-      modified_at: latestActivity?.toISOString() || new Date().toISOString(),
+      modified_at: latestActivity?.toISOString() || new Date().toISOString()
     });
   }
 
@@ -480,7 +508,7 @@ export async function handleStop(
         task_name: taskName,
         stopped: [],
         already_stopped: [],
-        not_found: [agentId],
+        not_found: [agentId]
       };
     }
     if (agent.taskName !== taskName) {
@@ -490,12 +518,12 @@ export async function handleStop(
 
     if (agent.status === AgentStatus.RUNNING) {
       const success = await manager.stop(agentId);
-      console.error(`[stop] Agent ${agentId}: ${success ? 'stopped' : 'failed to stop'}`);
+      console.error(`[stop] Agent ${agentId}: ${success ? "stopped" : "failed to stop"}`);
       return {
         task_name: taskName,
         stopped: success ? [agentId] : [],
         already_stopped: success ? [] : [agentId],
-        not_found: [],
+        not_found: []
       };
     } else {
       console.error(`[stop] Agent ${agentId} already stopped (status=${agent.status})`);
@@ -503,7 +531,7 @@ export async function handleStop(
         task_name: taskName,
         stopped: [],
         already_stopped: [agentId],
-        not_found: [],
+        not_found: []
       };
     }
   } else {
@@ -511,13 +539,15 @@ export async function handleStop(
 
     const result = await manager.stopByTask(taskName);
 
-    console.error(`[stop] Task "${taskName}": stopped ${result.stopped.length}, already_stopped ${result.alreadyStopped.length}`);
+    console.error(
+      `[stop] Task "${taskName}": stopped ${result.stopped.length}, already_stopped ${result.alreadyStopped.length}`
+    );
 
     return {
       task_name: taskName,
       stopped: result.stopped,
       already_stopped: result.alreadyStopped,
-      not_found: [],
+      not_found: []
     };
   }
 }
@@ -536,7 +566,9 @@ export async function handleReply(
 
   const replyAgent = await manager.reply(agent, message);
 
-  console.error(`[reply] Spawned reply agent ${replyAgent.agentId} (turn ${replyAgent.conversationTurn}) for original ${agentId}`);
+  console.error(
+    `[reply] Spawned reply agent ${replyAgent.agentId} (turn ${replyAgent.conversationTurn}) for original ${agentId}`
+  );
 
   return {
     agent_id: replyAgent.agentId,
@@ -545,6 +577,6 @@ export async function handleReply(
     task_name: replyAgent.taskName,
     conversation_turn: replyAgent.conversationTurn,
     status: replyAgent.status,
-    started_at: replyAgent.startedAt.toISOString(),
+    started_at: replyAgent.startedAt.toISOString()
   };
 }

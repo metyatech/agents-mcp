@@ -1,6 +1,6 @@
-import { AgentType } from './parsers.js';
+import { AgentType } from "./parsers.js";
 export declare function resolveBaseDir(): Promise<string>;
-export type EffortLevel = 'fast' | 'default' | 'detailed';
+export type EffortLevel = "fast" | "default" | "detailed";
 export type ModelOverrides = Partial<Record<AgentType, Partial<Record<EffortLevel, string>>>>;
 export interface ProviderConfig {
     apiEndpoint: string | null;

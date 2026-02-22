@@ -1,12 +1,12 @@
-import * as os from 'os';
-import * as path from 'path';
+import * as os from "os";
+import * as path from "path";
 export function getRalphConfig() {
-    const ralphFile = process.env.AGENTS_MCP_RALPH_FILE || 'RALPH.md';
-    const disabledStr = process.env.AGENTS_MCP_DISABLE_RALPH || 'false';
-    const disabled = disabledStr === 'true' || disabledStr === '1';
+    const ralphFile = process.env.AGENTS_MCP_RALPH_FILE || "RALPH.md";
+    const disabledStr = process.env.AGENTS_MCP_DISABLE_RALPH || "false";
+    const disabled = disabledStr === "true" || disabledStr === "1";
     return {
         ralphFile,
-        disabled,
+        disabled
     };
 }
 export function isDangerousPath(cwd) {
@@ -14,12 +14,12 @@ export function isDangerousPath(cwd) {
         // Home itself is dangerous, but project subdirectories under home are common and should be allowed.
         { p: os.homedir(), includeChildren: false },
         // System roots should be blocked recursively.
-        { p: '/', includeChildren: true },
-        { p: '/System', includeChildren: true },
-        { p: '/usr', includeChildren: true },
-        { p: '/bin', includeChildren: true },
-        { p: '/sbin', includeChildren: true },
-        { p: '/etc', includeChildren: true },
+        { p: "/", includeChildren: true },
+        { p: "/System", includeChildren: true },
+        { p: "/usr", includeChildren: true },
+        { p: "/bin", includeChildren: true },
+        { p: "/sbin", includeChildren: true },
+        { p: "/etc", includeChildren: true }
     ];
     const normalizedCwd = path.resolve(cwd);
     for (const { p, includeChildren } of dangerousPaths) {

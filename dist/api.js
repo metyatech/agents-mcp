@@ -2,10 +2,10 @@
  * Testable API handlers for the agent-swarm MCP server.
  * These functions can be called directly in tests with a custom AgentManager.
  */
-import * as path from 'path';
-import * as fs from 'fs/promises';
-import { AgentStatus, resolveMode } from './agents.js';
-import { getDelta, getErrorSnippets } from './summarizer.js';
+import * as path from "path";
+import * as fs from "fs/promises";
+import { AgentStatus, resolveMode } from "./agents.js";
+import { getDelta, getErrorSnippets } from "./summarizer.js";
 /**
  * Truncate a bash command for status output.
  * Handles heredocs specially - shows the redirect target instead of contents.
@@ -19,7 +19,7 @@ function truncateBashCommand(cmd, maxLen = 120) {
     // For regular commands, just truncate
     if (cmd.length <= maxLen)
         return cmd;
-    return cmd.substring(0, maxLen - 3) + '...';
+    return cmd.substring(0, maxLen - 3) + "...";
 }
 async function readTailLines(filePath, maxLines = 25, maxBytes = 64 * 1024) {
     const stats = await fs.stat(filePath).catch(() => null);
@@ -27,11 +27,11 @@ async function readTailLines(filePath, maxLines = 25, maxBytes = 64 * 1024) {
         return [];
     const toRead = Math.min(stats.size, maxBytes);
     const startPos = Math.max(0, stats.size - toRead);
-    const fd = await fs.open(filePath, 'r');
+    const fd = await fs.open(filePath, "r");
     try {
         const buffer = Buffer.alloc(toRead);
         const { bytesRead } = await fd.read(buffer, 0, toRead, startPos);
-        const text = buffer.toString('utf-8', 0, bytesRead);
+        const text = buffer.toString("utf-8", 0, bytesRead);
         const lines = text.split(/\r?\n/);
         return lines.slice(-maxLines).filter((l) => l.trim().length > 0);
     }
@@ -40,7 +40,18 @@ async function readTailLines(filePath, maxLines = 25, maxBytes = 64 * 1024) {
     }
 }
 function extractErrorLinesFromTail(lines, maxItems = 3) {
-    const keywords = ['error', 'failed', 'exception', 'denied', 'quota', 'rate limit', '429', '403', '401', 'policy'];
+    const keywords = [
+        "error",
+        "failed",
+        "exception",
+        "denied",
+        "quota",
+        "rate limit",
+        "429",
+        "403",
+        "401",
+        "policy"
+    ];
     const matches = lines.filter((line) => {
         const lower = line.toLowerCase();
         return keywords.some((k) => lower.includes(k));
@@ -50,18 +61,18 @@ function extractErrorLinesFromTail(lines, maxItems = 3) {
 export async function handleSpawn(manager, taskName, agentType, prompt, cwd, mode, parentSessionId = null, workspaceDir = null, model = null, effort = null) {
     const defaultMode = manager.getDefaultMode();
     const resolvedMode = resolveMode(mode, defaultMode);
-    console.error(`[spawn] Spawning ${agentType} agent for task "${taskName}" [${resolvedMode}]${effort ? ` effort=${effort}` : ''}${model ? ` model=${model}` : ''}...`);
+    console.error(`[spawn] Spawning ${agentType} agent for task "${taskName}" [${resolvedMode}]${effort ? ` effort=${effort}` : ""}${model ? ` model=${model}` : ""}...`);
     // Ralph mode special handling
-    if (resolvedMode === 'ralph') {
+    if (resolvedMode === "ralph") {
         if (!cwd) {
-            throw new Error('Ralph mode requires a cwd parameter');
+            throw new Error("Ralph mode requires a cwd parameter");
         }
         // Import ralph utilities
-        const { isDangerousPath, getRalphConfig, buildRalphPrompt } = await import('./ralph.js');
+        const { isDangerousPath, getRalphConfig, buildRalphPrompt } = await import("./ralph.js");
         const resolvedCwd = path.resolve(cwd);
         // Safety check
         if (isDangerousPath(resolvedCwd)) {
-            throw new Error('⚠️ Ralph mode in home or system directory is risky. Use a project directory.');
+            throw new Error("⚠️ Ralph mode in home or system directory is risky. Use a project directory.");
         }
         // Check RALPH.md exists
         const ralphConfig = getRalphConfig();
@@ -82,7 +93,7 @@ export async function handleSpawn(manager, taskName, agentType, prompt, cwd, mod
             agent_id: agent.agentId,
             agent_type: agent.agentType,
             status: agent.status,
-            started_at: agent.startedAt.toISOString(),
+            started_at: agent.startedAt.toISOString()
         };
     }
     // Regular spawn logic (plan/edit modes)
@@ -93,7 +104,7 @@ export async function handleSpawn(manager, taskName, agentType, prompt, cwd, mod
         agent_id: agent.agentId,
         agent_type: agent.agentType,
         status: agent.status,
-        started_at: agent.startedAt.toISOString(),
+        started_at: agent.startedAt.toISOString()
     };
 }
 async function collectStatus(manager, normalizedTaskName, normalizedParentSessionId, effectiveFilter, since) {
@@ -101,9 +112,7 @@ async function collectStatus(manager, normalizedTaskName, normalizedParentSessio
         ? await manager.listByParentSession(normalizedParentSessionId)
         : await manager.listByTask(normalizedTaskName);
     // Filter agents by status ('all' shows everything)
-    const agents = effectiveFilter === 'all'
-        ? allAgents
-        : allAgents.filter((a) => a.status === effectiveFilter);
+    const agents = effectiveFilter === "all" ? allAgents : allAgents.filter((a) => a.status === effectiveFilter);
     const agentStatuses = [];
     const counts = { running: 0, completed: 0, failed: 0, stopped: 0 };
     // Count ALL agents for summary (not just filtered)
@@ -135,16 +144,20 @@ async function collectStatus(manager, normalizedTaskName, normalizedParentSessio
         const diagnostics = agent.status === AgentStatus.FAILED
             ? (() => {
                 const agentDir = path.join(manager.getAgentsDirPath(), agent.agentId);
-                const stdoutPath = path.join(agentDir, 'stdout.log');
-                const metaPath = path.join(agentDir, 'meta.json');
+                const stdoutPath = path.join(agentDir, "stdout.log");
+                const metaPath = path.join(agentDir, "meta.json");
                 return { agentDir, stdoutPath, metaPath };
             })()
             : null;
         const diagPayload = diagnostics
             ? {
-                log_paths: { agent_dir: diagnostics.agentDir, stdout: diagnostics.stdoutPath, meta: diagnostics.metaPath },
+                log_paths: {
+                    agent_dir: diagnostics.agentDir,
+                    stdout: diagnostics.stdoutPath,
+                    meta: diagnostics.metaPath
+                },
                 log_tail: await readTailLines(diagnostics.stdoutPath),
-                tail_errors: [],
+                tail_errors: []
             }
             : undefined;
         if (diagPayload) {
@@ -169,14 +182,14 @@ async function collectStatus(manager, normalizedTaskName, normalizedParentSessio
             conversation_turn: agent.conversationTurn,
             original_agent_id: agent.originalAgentId,
             reply_agent_ids: agent.replyAgentIds,
-            session_id: agent.sessionId,
+            session_id: agent.sessionId
         });
     }
     return {
         task_name: normalizedTaskName,
         agents: agentStatuses,
         summary: counts,
-        cursor: maxTimestamp,
+        cursor: maxTimestamp
     };
 }
 const WAIT_POLL_INTERVAL_MS = 1000;
@@ -185,23 +198,23 @@ const WAIT_MAX_TIMEOUT_MS = 600_000;
 export async function handleStatus(manager, taskName, filter, since, // Optional ISO timestamp - return only events after this time
 parentSessionId, wait, timeout) {
     // Default to 'all' so callers see completed/failed agents unless they opt to filter
-    const effectiveFilter = filter || 'all';
-    const normalizedTaskName = taskName?.trim() || '';
-    const normalizedParentSessionId = parentSessionId?.trim() || '';
+    const effectiveFilter = filter || "all";
+    const normalizedTaskName = taskName?.trim() || "";
+    const normalizedParentSessionId = parentSessionId?.trim() || "";
     if (!normalizedTaskName && !normalizedParentSessionId) {
-        throw new Error('task_name is required when parent_session_id is not provided');
+        throw new Error("task_name is required when parent_session_id is not provided");
     }
     const lookupLabel = normalizedParentSessionId && !normalizedTaskName
         ? `parent_session_id "${normalizedParentSessionId}"`
         : `task "${normalizedTaskName}"`;
-    console.error(`[status] Getting status for agents in ${lookupLabel} (filter=${effectiveFilter}${wait ? `, wait=true, timeout=${timeout ?? WAIT_DEFAULT_TIMEOUT_MS}ms` : ''})...`);
+    console.error(`[status] Getting status for agents in ${lookupLabel} (filter=${effectiveFilter}${wait ? `, wait=true, timeout=${timeout ?? WAIT_DEFAULT_TIMEOUT_MS}ms` : ""})...`);
     let result = await collectStatus(manager, normalizedTaskName, normalizedParentSessionId, effectiveFilter, since);
     if (wait && result.summary.running > 0) {
         const effectiveTimeout = Math.min(timeout ?? WAIT_DEFAULT_TIMEOUT_MS, WAIT_MAX_TIMEOUT_MS);
         const deadline = Date.now() + effectiveTimeout;
         console.error(`[status] Waiting for running agents (deadline in ${effectiveTimeout}ms)...`);
         while (result.summary.running > 0 && Date.now() < deadline) {
-            await new Promise(resolve => setTimeout(resolve, WAIT_POLL_INTERVAL_MS));
+            await new Promise((resolve) => setTimeout(resolve, WAIT_POLL_INTERVAL_MS));
             result = await collectStatus(manager, normalizedTaskName, normalizedParentSessionId, effectiveFilter, since);
         }
         if (result.summary.running > 0) {
@@ -247,9 +260,7 @@ export async function handleTasks(manager, limit = 10) {
             }
             // Track latest activity (modified_at)
             // For running agents, use current time; for others use completedAt or startedAt
-            const activityTime = agent.status === AgentStatus.RUNNING
-                ? new Date()
-                : (agent.completedAt || agent.startedAt);
+            const activityTime = agent.status === AgentStatus.RUNNING ? new Date() : agent.completedAt || agent.startedAt;
             if (!latestActivity || activityTime > latestActivity) {
                 latestActivity = activityTime;
             }
@@ -267,7 +278,7 @@ export async function handleTasks(manager, limit = 10) {
             stopped,
             workspace_dir: workspaceDir,
             created_at: earliestStart?.toISOString() || new Date().toISOString(),
-            modified_at: latestActivity?.toISOString() || new Date().toISOString(),
+            modified_at: latestActivity?.toISOString() || new Date().toISOString()
         });
     }
     // Sort by modified_at descending (most recent first)
@@ -287,7 +298,7 @@ export async function handleStop(manager, taskName, agentId) {
                 task_name: taskName,
                 stopped: [],
                 already_stopped: [],
-                not_found: [agentId],
+                not_found: [agentId]
             };
         }
         if (agent.taskName !== taskName) {
@@ -296,12 +307,12 @@ export async function handleStop(manager, taskName, agentId) {
         }
         if (agent.status === AgentStatus.RUNNING) {
             const success = await manager.stop(agentId);
-            console.error(`[stop] Agent ${agentId}: ${success ? 'stopped' : 'failed to stop'}`);
+            console.error(`[stop] Agent ${agentId}: ${success ? "stopped" : "failed to stop"}`);
             return {
                 task_name: taskName,
                 stopped: success ? [agentId] : [],
                 already_stopped: success ? [] : [agentId],
-                not_found: [],
+                not_found: []
             };
         }
         else {
@@ -310,7 +321,7 @@ export async function handleStop(manager, taskName, agentId) {
                 task_name: taskName,
                 stopped: [],
                 already_stopped: [agentId],
-                not_found: [],
+                not_found: []
             };
         }
     }
@@ -322,7 +333,7 @@ export async function handleStop(manager, taskName, agentId) {
             task_name: taskName,
             stopped: result.stopped,
             already_stopped: result.alreadyStopped,
-            not_found: [],
+            not_found: []
         };
     }
 }
@@ -341,7 +352,7 @@ export async function handleReply(manager, agentId, message) {
         task_name: replyAgent.taskName,
         conversation_turn: replyAgent.conversationTurn,
         status: replyAgent.status,
-        started_at: replyAgent.startedAt.toISOString(),
+        started_at: replyAgent.startedAt.toISOString()
     };
 }
 //# sourceMappingURL=api.js.map

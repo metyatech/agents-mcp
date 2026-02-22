@@ -1,5 +1,6 @@
-CHANGELOG
+# Changelog
 
-2026-01-07
+## 2026-01-07
+
 - Added a changelog file.
 - Rewrote README to focus on MCP ecosystem needs and agent orchestration value.

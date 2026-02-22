@@ -8,9 +8,9 @@ interface VersionStatus {
     current: string;
     latest: string | null;
     isOutOfDate: boolean;
-    status: 'current' | 'outdated' | 'unknown';
+    status: "current" | "outdated" | "unknown";
 }
-type ClientType = 'claude' | 'codex' | 'gemini' | 'unknown';
+type ClientType = "claude" | "codex" | "gemini" | "unknown";
 export declare const CACHE_DIR: string;
 export declare const CACHE_FILE: string;
 export declare const CACHE_TTL_MS: number;

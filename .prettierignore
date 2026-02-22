@@ -1,0 +1,7 @@
+dist/
+node_modules/
+promo/
+AGENTS.md
+bun.lock
+*.jsonl
+tests/testdata/

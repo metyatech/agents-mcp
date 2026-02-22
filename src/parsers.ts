@@ -1,31 +1,33 @@
-import { extractFileOpsFromBash } from './file_ops.js';
+import { extractFileOpsFromBash } from "./file_ops.js";
 
-export type AgentType = 'codex' | 'gemini' | 'cursor' | 'claude' | 'opencode' | 'copilot';
+export type AgentType = "codex" | "gemini" | "cursor" | "claude" | "opencode" | "copilot";
 
 const claudeToolUseMap = new Map<string, { tool: string; command?: string; path?: string }>();
 
 export function normalizeEvents(agentType: AgentType, raw: any): any[] {
-  if (agentType === 'codex') {
+  if (agentType === "codex") {
     return normalizeCodex(raw);
-  } else if (agentType === 'cursor') {
+  } else if (agentType === "cursor") {
     return normalizeCursor(raw);
-  } else if (agentType === 'gemini') {
+  } else if (agentType === "gemini") {
     return normalizeGemini(raw);
-  } else if (agentType === 'claude') {
+  } else if (agentType === "claude") {
     return normalizeClaude(raw);
-  } else if (agentType === 'opencode') {
+  } else if (agentType === "opencode") {
     return normalizeOpencode(raw);
-  } else if (agentType === 'copilot') {
+  } else if (agentType === "copilot") {
     return normalizeCopilot(raw);
   }
 
   const timestamp = new Date().toISOString();
-  return [{
-    type: raw.type || 'unknown',
-    agent: agentType,
-    raw: raw,
-    timestamp: timestamp,
-  }];
+  return [
+    {
+      type: raw.type || "unknown",
+      agent: agentType,
+      raw: raw,
+      timestamp: timestamp
+    }
+  ];
 }
 
 export function normalizeEvent(agentType: AgentType, raw: any): any {
@@ -35,646 +37,742 @@ export function normalizeEvent(agentType: AgentType, raw: any): any {
   }
 
   return {
-    type: raw.type || 'unknown',
+    type: raw.type || "unknown",
     agent: agentType,
     raw: raw,
-    timestamp: new Date().toISOString(),
+    timestamp: new Date().toISOString()
   };
 }
 
 function normalizeCodex(raw: any): any[] {
-  if (!raw || typeof raw !== 'object') {
-    return [{
-      type: 'unknown',
-      agent: 'codex',
-      raw: raw,
-      timestamp: new Date().toISOString(),
-    }];
+  if (!raw || typeof raw !== "object") {
+    return [
+      {
+        type: "unknown",
+        agent: "codex",
+        raw: raw,
+        timestamp: new Date().toISOString()
+      }
+    ];
   }
 
-  const eventType = raw.type || 'unknown';
+  const eventType = raw.type || "unknown";
   const timestamp = new Date().toISOString();
 
-  if (eventType === 'thread.started') {
-    return [{
-      type: 'init',
-      agent: 'codex',
-      session_id: raw.thread_id || null,
-      timestamp: timestamp,
-    }];
-  } else if (eventType === 'turn.started') {
-    return [{
-      type: 'turn_start',
-      agent: 'codex',
-      timestamp: timestamp,
-    }];
-  } else if (eventType === 'item.completed') {
+  if (eventType === "thread.started") {
+    return [
+      {
+        type: "init",
+        agent: "codex",
+        session_id: raw.thread_id || null,
+        timestamp: timestamp
+      }
+    ];
+  } else if (eventType === "turn.started") {
+    return [
+      {
+        type: "turn_start",
+        agent: "codex",
+        timestamp: timestamp
+      }
+    ];
+  } else if (eventType === "item.completed") {
     const item = raw.item || {};
     const itemType = item?.type;
 
-    if (itemType === 'agent_message') {
-      return [{
-        type: 'message',
-        agent: 'codex',
-        content: item?.text || '',
-        complete: true,
-        timestamp: timestamp,
-      }];
-    } else if (itemType === 'command_execution') {
-      const command = item?.command || '';
+    if (itemType === "agent_message") {
+      return [
+        {
+          type: "message",
+          agent: "codex",
+          content: item?.text || "",
+          complete: true,
+          timestamp: timestamp
+        }
+      ];
+    } else if (itemType === "command_execution") {
+      const command = item?.command || "";
       if (!command.trim()) {
         return [];
       }
-      const events: any[] = [{
-        type: 'bash',
-        agent: 'codex',
-        tool: 'command_execution',
-        command: command,
-        timestamp: timestamp,
-      }];
+      const events: any[] = [
+        {
+          type: "bash",
+          agent: "codex",
+          tool: "command_execution",
+          command: command,
+          timestamp: timestamp
+        }
+      ];
 
       const [filesRead, filesWritten, filesDeleted] = extractFileOpsFromBash(command);
       for (const path of filesRead) {
         events.push({
-          type: 'file_read',
-          agent: 'codex',
-          tool: 'bash',
+          type: "file_read",
+          agent: "codex",
+          tool: "bash",
           path,
           command,
-          timestamp,
+          timestamp
         });
       }
       for (const path of filesWritten) {
         events.push({
-          type: 'file_write',
-          agent: 'codex',
-          tool: 'bash',
+          type: "file_write",
+          agent: "codex",
+          tool: "bash",
           path,
           command,
-          timestamp,
+          timestamp
         });
       }
       for (const path of filesDeleted) {
         events.push({
-          type: 'file_delete',
-          agent: 'codex',
-          tool: 'bash',
+          type: "file_delete",
+          agent: "codex",
+          tool: "bash",
           path,
           command,
-          timestamp,
+          timestamp
         });
       }
 
       return events;
-    } else if (itemType === 'file_change') {
+    } else if (itemType === "file_change") {
       const changes = Array.isArray(item?.changes) ? item.changes : [];
       const changeEvents: any[] = [];
 
       for (const change of changes) {
-        const path = change?.path || change?.file_path || '';
+        const path = change?.path || change?.file_path || "";
         if (!path) {
           continue;
         }
 
-        const kind = String(change?.kind || change?.status || '').toLowerCase();
+        const kind = String(change?.kind || change?.status || "").toLowerCase();
         const baseEvent = {
-          agent: 'codex',
-          tool: 'file_change',
+          agent: "codex",
+          tool: "file_change",
           path,
-          timestamp,
+          timestamp
         };
 
-        if (['add', 'create', 'new'].includes(kind)) {
-          changeEvents.push({ ...baseEvent, type: 'file_create' });
-        } else if (['delete', 'remove'].includes(kind)) {
-          changeEvents.push({ ...baseEvent, type: 'file_delete' });
+        if (["add", "create", "new"].includes(kind)) {
+          changeEvents.push({ ...baseEvent, type: "file_create" });
+        } else if (["delete", "remove"].includes(kind)) {
+          changeEvents.push({ ...baseEvent, type: "file_delete" });
         } else {
-          changeEvents.push({ ...baseEvent, type: 'file_write' });
+          changeEvents.push({ ...baseEvent, type: "file_write" });
         }
       }
 
       if (changeEvents.length > 0) {
         return changeEvents;
       }
-    } else if (itemType === 'tool_call') {
-      const toolName = item?.name || 'unknown';
+    } else if (itemType === "tool_call") {
+      const toolName = item?.name || "unknown";
       const toolArgs = item?.arguments || {};
 
-      if (toolName === 'create_file') {
-        const path = toolArgs?.path || toolArgs?.file_path || '';
+      if (toolName === "create_file") {
+        const path = toolArgs?.path || toolArgs?.file_path || "";
         if (!path) {
           return [];
         }
-        return [{
-          type: 'file_create',
-          agent: 'codex',
-          tool: toolName,
-          path: path,
-          timestamp: timestamp,
-        }];
-      } else if (toolName === 'write_file' || toolName === 'edit_file') {
-        const path = toolArgs?.path || toolArgs?.file_path || '';
+        return [
+          {
+            type: "file_create",
+            agent: "codex",
+            tool: toolName,
+            path: path,
+            timestamp: timestamp
+          }
+        ];
+      } else if (toolName === "write_file" || toolName === "edit_file") {
+        const path = toolArgs?.path || toolArgs?.file_path || "";
         if (!path) {
           return [];
         }
-        return [{
-          type: 'file_write',
-          agent: 'codex',
-          tool: toolName,
-          path: path,
-          timestamp: timestamp,
-        }];
-      } else if (toolName === 'read_file') {
-        const path = toolArgs?.path || toolArgs?.file_path || '';
+        return [
+          {
+            type: "file_write",
+            agent: "codex",
+            tool: toolName,
+            path: path,
+            timestamp: timestamp
+          }
+        ];
+      } else if (toolName === "read_file") {
+        const path = toolArgs?.path || toolArgs?.file_path || "";
         if (!path) {
           return [];
         }
-        return [{
-          type: 'file_read',
-          agent: 'codex',
-          tool: toolName,
-          path: path,
-          timestamp: timestamp,
-        }];
-      } else if (toolName === 'delete_file' || toolName === 'remove_file') {
-        const path = toolArgs?.path || toolArgs?.file_path || '';
+        return [
+          {
+            type: "file_read",
+            agent: "codex",
+            tool: toolName,
+            path: path,
+            timestamp: timestamp
+          }
+        ];
+      } else if (toolName === "delete_file" || toolName === "remove_file") {
+        const path = toolArgs?.path || toolArgs?.file_path || "";
         if (!path) {
           return [];
         }
-        return [{
-          type: 'file_delete',
-          agent: 'codex',
-          tool: toolName,
-          path: path,
-          timestamp: timestamp,
-        }];
-      } else if (toolName === 'shell' || toolName === 'bash' || toolName === 'execute') {
-        const command = toolArgs?.command || '';
+        return [
+          {
+            type: "file_delete",
+            agent: "codex",
+            tool: toolName,
+            path: path,
+            timestamp: timestamp
+          }
+        ];
+      } else if (toolName === "shell" || toolName === "bash" || toolName === "execute") {
+        const command = toolArgs?.command || "";
         if (!command.trim()) {
           return [];
         }
-        return [{
-          type: 'bash',
-          agent: 'codex',
-          tool: toolName,
-          command: command,
-          timestamp: timestamp,
-        }];
+        return [
+          {
+            type: "bash",
+            agent: "codex",
+            tool: toolName,
+            command: command,
+            timestamp: timestamp
+          }
+        ];
       } else {
-        return [{
-          type: 'tool_use',
-          agent: 'codex',
-          tool: toolName,
-          args: toolArgs,
-          timestamp: timestamp,
-        }];
+        return [
+          {
+            type: "tool_use",
+            agent: "codex",
+            tool: toolName,
+            args: toolArgs,
+            timestamp: timestamp
+          }
+        ];
       }
     }
-  } else if (eventType === 'turn.completed') {
+  } else if (eventType === "turn.completed") {
     const usage = raw.usage || {};
-    return [{
-      type: 'result',
-      agent: 'codex',
-      status: 'success',
-      usage: {
-        input_tokens: usage?.input_tokens || 0,
-        output_tokens: usage?.output_tokens || 0,
-      },
-      timestamp: timestamp,
-    }];
+    return [
+      {
+        type: "result",
+        agent: "codex",
+        status: "success",
+        usage: {
+          input_tokens: usage?.input_tokens || 0,
+          output_tokens: usage?.output_tokens || 0
+        },
+        timestamp: timestamp
+      }
+    ];
   }
 
-  return [{
-    type: eventType,
-    agent: 'codex',
-    raw: raw,
-    timestamp: timestamp,
-  }];
+  return [
+    {
+      type: eventType,
+      agent: "codex",
+      raw: raw,
+      timestamp: timestamp
+    }
+  ];
 }
 
 function normalizeCursor(raw: any): any[] {
-  const eventType = raw.type || 'unknown';
+  const eventType = raw.type || "unknown";
   const subtype = raw.subtype;
   const timestamp = new Date().toISOString();
 
-  if (eventType === 'system' && subtype === 'init') {
-    return [{
-      type: 'init',
-      agent: 'cursor',
-      model: raw.model,
-      session_id: raw.session_id,
-      timestamp: timestamp,
-    }];
-  } else if (eventType === 'thinking') {
-    if (subtype === 'delta') {
-      const text = raw.text || '';
+  if (eventType === "system" && subtype === "init") {
+    return [
+      {
+        type: "init",
+        agent: "cursor",
+        model: raw.model,
+        session_id: raw.session_id,
+        timestamp: timestamp
+      }
+    ];
+  } else if (eventType === "thinking") {
+    if (subtype === "delta") {
+      const text = raw.text || "";
       if (!text.trim()) {
         return [];
       }
     }
-    return [{
-      type: 'thinking',
-      agent: 'cursor',
-      content: raw.text || '',
-      complete: subtype === 'completed',
-      timestamp: timestamp,
-    }];
-  } else if (eventType === 'assistant') {
+    return [
+      {
+        type: "thinking",
+        agent: "cursor",
+        content: raw.text || "",
+        complete: subtype === "completed",
+        timestamp: timestamp
+      }
+    ];
+  } else if (eventType === "assistant") {
     const message = raw.message || {};
     const contentBlocks = message.content || [];
     const events: any[] = [];
-    let textContent = '';
+    let textContent = "";
 
     for (const block of contentBlocks) {
-      if (block.type === 'text') {
-        textContent += block.text || '';
-      } else if (block.type === 'tool_use') {
+      if (block.type === "text") {
+        textContent += block.text || "";
+      } else if (block.type === "tool_use") {
         events.push({
-          type: 'tool_use',
-          agent: 'cursor',
-          tool: block.name || 'unknown',
+          type: "tool_use",
+          agent: "cursor",
+          tool: block.name || "unknown",
           args: block.input || {},
-          timestamp: timestamp,
+          timestamp: timestamp
         });
       }
     }
 
     if (textContent) {
       events.push({
-        type: 'message',
-        agent: 'cursor',
+        type: "message",
+        agent: "cursor",
         content: textContent,
         complete: true,
-        timestamp: timestamp,
+        timestamp: timestamp
       });
     }
 
     if (events.length === 0) {
       events.push({
-        type: 'message',
-        agent: 'cursor',
-        content: '',
+        type: "message",
+        agent: "cursor",
+        content: "",
         complete: true,
-        timestamp: timestamp,
+        timestamp: timestamp
       });
     }
 
     return events;
-  } else if (eventType === 'result') {
-    return [{
-      type: 'result',
-      agent: 'cursor',
-      status: subtype || 'success',
-      duration_ms: raw.duration_ms,
-      timestamp: timestamp,
-    }];
-  } else if (eventType === 'tool_result') {
-    return [{
-      type: 'tool_result',
-      agent: 'cursor',
-      tool: raw.tool_name || 'unknown',
-      success: raw.success !== false,
-      timestamp: timestamp,
-    }];
-  } else if (eventType === 'tool_call' && subtype === 'completed') {
+  } else if (eventType === "result") {
+    return [
+      {
+        type: "result",
+        agent: "cursor",
+        status: subtype || "success",
+        duration_ms: raw.duration_ms,
+        timestamp: timestamp
+      }
+    ];
+  } else if (eventType === "tool_result") {
+    return [
+      {
+        type: "tool_result",
+        agent: "cursor",
+        tool: raw.tool_name || "unknown",
+        success: raw.success !== false,
+        timestamp: timestamp
+      }
+    ];
+  } else if (eventType === "tool_call" && subtype === "completed") {
     const toolCall = raw.tool_call;
 
     if (toolCall?.shellToolCall) {
-      const command = toolCall.shellToolCall.args?.command || '';
-      return [{
-        type: 'bash',
-        agent: 'cursor',
-        tool: 'shell',
-        command: command,
-        timestamp: timestamp,
-      }];
+      const command = toolCall.shellToolCall.args?.command || "";
+      return [
+        {
+          type: "bash",
+          agent: "cursor",
+          tool: "shell",
+          command: command,
+          timestamp: timestamp
+        }
+      ];
     } else if (toolCall?.editToolCall) {
-      const filePath = toolCall.editToolCall.args?.path || '';
-      return [{
-        type: 'file_write',
-        agent: 'cursor',
-        tool: 'edit',
-        path: filePath,
-        timestamp: timestamp,
-      }];
+      const filePath = toolCall.editToolCall.args?.path || "";
+      return [
+        {
+          type: "file_write",
+          agent: "cursor",
+          tool: "edit",
+          path: filePath,
+          timestamp: timestamp
+        }
+      ];
     } else if (toolCall?.readToolCall) {
-      const filePath = toolCall.readToolCall.args?.path || '';
-      return [{
-        type: 'file_read',
-        agent: 'cursor',
-        tool: 'read',
-        path: filePath,
-        timestamp: timestamp,
-      }];
+      const filePath = toolCall.readToolCall.args?.path || "";
+      return [
+        {
+          type: "file_read",
+          agent: "cursor",
+          tool: "read",
+          path: filePath,
+          timestamp: timestamp
+        }
+      ];
     } else if (toolCall?.deleteToolCall) {
-      const filePath = toolCall.deleteToolCall.args?.path || '';
-      return [{
-        type: 'file_delete',
-        agent: 'cursor',
-        tool: 'delete',
-        path: filePath,
-        timestamp: timestamp,
-      }];
+      const filePath = toolCall.deleteToolCall.args?.path || "";
+      return [
+        {
+          type: "file_delete",
+          agent: "cursor",
+          tool: "delete",
+          path: filePath,
+          timestamp: timestamp
+        }
+      ];
     } else if (toolCall?.listToolCall) {
-      const dirPath = toolCall.listToolCall.args?.path || '';
-      return [{
-        type: 'directory_list',
-        agent: 'cursor',
-        tool: 'list',
-        path: dirPath,
-        timestamp: timestamp,
-      }];
+      const dirPath = toolCall.listToolCall.args?.path || "";
+      return [
+        {
+          type: "directory_list",
+          agent: "cursor",
+          tool: "list",
+          path: dirPath,
+          timestamp: timestamp
+        }
+      ];
     }
 
-    return [{
-      type: 'tool_use',
-      agent: 'cursor',
-      tool: Object.keys(toolCall || {})[0] || 'unknown',
-      timestamp: timestamp,
-    }];
+    return [
+      {
+        type: "tool_use",
+        agent: "cursor",
+        tool: Object.keys(toolCall || {})[0] || "unknown",
+        timestamp: timestamp
+      }
+    ];
   }
 
-  return [{
-    type: eventType,
-    agent: 'cursor',
-    raw: raw,
-    timestamp: timestamp,
-  }];
+  return [
+    {
+      type: eventType,
+      agent: "cursor",
+      raw: raw,
+      timestamp: timestamp
+    }
+  ];
 }
 
 function normalizeGemini(raw: any): any[] {
-  if (!raw || typeof raw !== 'object') {
-    return [{
-      type: 'unknown',
-      agent: 'gemini',
-      raw: raw,
-      timestamp: new Date().toISOString(),
-    }];
+  if (!raw || typeof raw !== "object") {
+    return [
+      {
+        type: "unknown",
+        agent: "gemini",
+        raw: raw,
+        timestamp: new Date().toISOString()
+      }
+    ];
   }
 
-  const eventType = raw?.type || 'unknown';
+  const eventType = raw?.type || "unknown";
   const timestamp = raw?.timestamp || new Date().toISOString();
 
-  if (eventType === 'init') {
-    return [{
-      type: 'init',
-      agent: 'gemini',
-      model: raw?.model,
-      session_id: raw?.session_id,
-      timestamp: timestamp,
-    }];
-  } else if (eventType === 'message') {
-    const role = raw?.role || 'assistant';
-    if (role === 'assistant') {
-      return [{
-        type: 'message',
-        agent: 'gemini',
-        content: raw?.content || '',
-        complete: !raw?.delta,
-        timestamp: timestamp,
-      }];
+  if (eventType === "init") {
+    return [
+      {
+        type: "init",
+        agent: "gemini",
+        model: raw?.model,
+        session_id: raw?.session_id,
+        timestamp: timestamp
+      }
+    ];
+  } else if (eventType === "message") {
+    const role = raw?.role || "assistant";
+    if (role === "assistant") {
+      return [
+        {
+          type: "message",
+          agent: "gemini",
+          content: raw?.content || "",
+          complete: !raw?.delta,
+          timestamp: timestamp
+        }
+      ];
     } else {
-      return [{
-        type: 'user_message',
-        agent: 'gemini',
-        content: raw?.content || '',
-        timestamp: timestamp,
-      }];
+      return [
+        {
+          type: "user_message",
+          agent: "gemini",
+          content: raw?.content || "",
+          timestamp: timestamp
+        }
+      ];
     }
-  } else if (eventType === 'tool_call' || eventType === 'tool_use') {
-    const toolNameRaw = raw?.tool_name || raw?.name || 'unknown';
+  } else if (eventType === "tool_call" || eventType === "tool_use") {
+    const toolNameRaw = raw?.tool_name || raw?.name || "unknown";
     const toolName = String(toolNameRaw);
 
     let toolArgsRaw = raw?.parameters;
     if (toolArgsRaw === null || toolArgsRaw === undefined) {
       toolArgsRaw = raw?.args;
     }
-    const toolArgs = (typeof toolArgsRaw === 'object' && toolArgsRaw !== null) ? toolArgsRaw : {};
+    const toolArgs = typeof toolArgsRaw === "object" && toolArgsRaw !== null ? toolArgsRaw : {};
     const toolNameLower = toolName.toLowerCase();
 
-    const filePath = toolArgs?.file_path || toolArgs?.path || '';
-    const command = toolArgs?.command || '';
+    const filePath = toolArgs?.file_path || toolArgs?.path || "";
+    const command = toolArgs?.command || "";
 
     // File write/edit tools - Gemini uses 'replace', 'edit', 'patch', 'write_file', etc.
-    const writeTools = ['replace', 'edit', 'patch', 'write_file', 'edit_file', 'update_file', 'modify_file'];
-    if (writeTools.includes(toolNameLower) || (toolNameLower.includes('write') && toolNameLower.includes('file'))) {
+    const writeTools = [
+      "replace",
+      "edit",
+      "patch",
+      "write_file",
+      "edit_file",
+      "update_file",
+      "modify_file"
+    ];
+    if (
+      writeTools.includes(toolNameLower) ||
+      (toolNameLower.includes("write") && toolNameLower.includes("file"))
+    ) {
       if (!filePath.trim()) {
         return [];
       }
-      return [{
-        type: 'file_write',
-        agent: 'gemini',
-        tool: toolName,
-        path: filePath,
-        timestamp: timestamp,
-      }];
+      return [
+        {
+          type: "file_write",
+          agent: "gemini",
+          tool: toolName,
+          path: filePath,
+          timestamp: timestamp
+        }
+      ];
     }
 
     // File read tools
-    const readTools = ['read_file', 'view_file', 'cat_file', 'get_file'];
-    if (readTools.includes(toolNameLower) || (toolNameLower.includes('read') && toolNameLower.includes('file'))) {
+    const readTools = ["read_file", "view_file", "cat_file", "get_file"];
+    if (
+      readTools.includes(toolNameLower) ||
+      (toolNameLower.includes("read") && toolNameLower.includes("file"))
+    ) {
       if (!filePath.trim()) {
         return [];
       }
-      return [{
-        type: 'file_read',
-        agent: 'gemini',
-        tool: toolName,
-        path: filePath,
-        timestamp: timestamp,
-      }];
+      return [
+        {
+          type: "file_read",
+          agent: "gemini",
+          tool: toolName,
+          path: filePath,
+          timestamp: timestamp
+        }
+      ];
     }
 
     // File delete tools
-    const deleteTools = ['delete_file', 'remove_file', 'rm_file'];
-    if (deleteTools.includes(toolNameLower) || (toolNameLower.includes('delete') && toolNameLower.includes('file'))) {
+    const deleteTools = ["delete_file", "remove_file", "rm_file"];
+    if (
+      deleteTools.includes(toolNameLower) ||
+      (toolNameLower.includes("delete") && toolNameLower.includes("file"))
+    ) {
       if (!filePath.trim()) {
         return [];
       }
-      return [{
-        type: 'file_delete',
-        agent: 'gemini',
-        tool: toolName,
-        path: filePath,
-        timestamp: timestamp,
-      }];
+      return [
+        {
+          type: "file_delete",
+          agent: "gemini",
+          tool: toolName,
+          path: filePath,
+          timestamp: timestamp
+        }
+      ];
     }
 
     // Shell/bash tools
-    if (['shell', 'bash', 'execute', 'run_command', 'run_shell_command'].includes(toolNameLower)) {
+    if (["shell", "bash", "execute", "run_command", "run_shell_command"].includes(toolNameLower)) {
       if (!command.trim()) {
         return [];
       }
-      return [{
-        type: 'bash',
-        agent: 'gemini',
-        tool: toolName,
-        command: command,
-        timestamp: timestamp,
-      }];
+      return [
+        {
+          type: "bash",
+          agent: "gemini",
+          tool: toolName,
+          command: command,
+          timestamp: timestamp
+        }
+      ];
     }
 
-    return [{
-      type: 'tool_use',
-      agent: 'gemini',
-      tool: toolName,
-      args: toolArgs,
-      timestamp: timestamp,
-    }];
-  } else if (eventType === 'result') {
+    return [
+      {
+        type: "tool_use",
+        agent: "gemini",
+        tool: toolName,
+        args: toolArgs,
+        timestamp: timestamp
+      }
+    ];
+  } else if (eventType === "result") {
     const stats = raw?.stats || {};
-    return [{
-      type: 'result',
-      agent: 'gemini',
-      status: raw?.status || 'success',
-      duration_ms: stats?.duration_ms,
-      usage: {
-        total_tokens: stats?.total_tokens || 0,
-      },
-      timestamp: timestamp,
-    }];
+    return [
+      {
+        type: "result",
+        agent: "gemini",
+        status: raw?.status || "success",
+        duration_ms: stats?.duration_ms,
+        usage: {
+          total_tokens: stats?.total_tokens || 0
+        },
+        timestamp: timestamp
+      }
+    ];
   }
 
-  return [{
-    type: eventType,
-    agent: 'gemini',
-    raw: raw,
-    timestamp: timestamp,
-  }];
+  return [
+    {
+      type: eventType,
+      agent: "gemini",
+      raw: raw,
+      timestamp: timestamp
+    }
+  ];
 }
 
 function normalizeClaude(raw: any): any[] {
-  const eventType = raw.type || 'unknown';
+  const eventType = raw.type || "unknown";
   const subtype = raw.subtype;
   const timestamp = new Date().toISOString();
 
-  if (eventType === 'system' && subtype === 'init') {
-    return [{
-      type: 'init',
-      agent: 'claude',
-      model: raw.model,
-      session_id: raw.session_id,
-      timestamp: timestamp,
-    }];
-  } else if (eventType === 'assistant') {
+  if (eventType === "system" && subtype === "init") {
+    return [
+      {
+        type: "init",
+        agent: "claude",
+        model: raw.model,
+        session_id: raw.session_id,
+        timestamp: timestamp
+      }
+    ];
+  } else if (eventType === "assistant") {
     const message = raw.message || {};
     const contentBlocks = message.content || [];
     const events: any[] = [];
-    let textContent = '';
+    let textContent = "";
 
     for (const block of contentBlocks) {
-      if (block.type === 'text') {
-        textContent += block.text || '';
-      } else if (block.type === 'tool_use') {
-        const toolName = block.name || 'unknown';
+      if (block.type === "text") {
+        textContent += block.text || "";
+      } else if (block.type === "tool_use") {
+        const toolName = block.name || "unknown";
         const toolId = block.id;
         const toolInput = block.input || {};
-        
+
         if (toolId) {
-          if (toolName === 'Bash' && toolInput.command) {
+          if (toolName === "Bash" && toolInput.command) {
             claudeToolUseMap.set(toolId, { tool: toolName, command: toolInput.command });
-          } else if ((toolName === 'Edit' || toolName === 'Write') && toolInput.file_path) {
+          } else if ((toolName === "Edit" || toolName === "Write") && toolInput.file_path) {
             claudeToolUseMap.set(toolId, { tool: toolName, path: toolInput.file_path });
-          } else if (toolName === 'Read' && toolInput.file_path) {
+          } else if (toolName === "Read" && toolInput.file_path) {
             claudeToolUseMap.set(toolId, { tool: toolName, path: toolInput.file_path });
           }
         }
-        
+
         events.push({
-          type: 'tool_use',
-          agent: 'claude',
+          type: "tool_use",
+          agent: "claude",
           tool: toolName,
           args: toolInput,
-          timestamp: timestamp,
+          timestamp: timestamp
         });
       }
     }
 
     if (textContent) {
       events.push({
-        type: 'message',
-        agent: 'claude',
+        type: "message",
+        agent: "claude",
         content: textContent,
         complete: true,
-        timestamp: timestamp,
+        timestamp: timestamp
       });
     }
 
     if (events.length === 0) {
       events.push({
-        type: 'message',
-        agent: 'claude',
-        content: '',
+        type: "message",
+        agent: "claude",
+        content: "",
         complete: true,
-        timestamp: timestamp,
+        timestamp: timestamp
       });
     }
 
     return events;
-  } else if (eventType === 'user') {
+  } else if (eventType === "user") {
     const message = raw.message || {};
     const contentBlocks = message.content || [];
     const toolUseResult = raw.tool_use_result;
     const events: any[] = [];
 
     for (const block of contentBlocks) {
-      if (block.type === 'tool_result') {
+      if (block.type === "tool_result") {
         const toolUseId = block.tool_use_id;
 
         if (toolUseResult?.file) {
           events.push({
-            type: 'file_read',
-            agent: 'claude',
+            type: "file_read",
+            agent: "claude",
             path: toolUseResult.file.filePath,
-            timestamp: timestamp,
+            timestamp: timestamp
           });
         } else if (toolUseResult?.stdout !== undefined) {
           const toolUseInfo = claudeToolUseMap.get(toolUseId);
-          const command = toolUseInfo?.command || '';
+          const command = toolUseInfo?.command || "";
           events.push({
-            type: 'bash',
-            agent: 'claude',
+            type: "bash",
+            agent: "claude",
             command: command,
-            timestamp: timestamp,
+            timestamp: timestamp
           });
           claudeToolUseMap.delete(toolUseId);
-        } else if (!block.is_error && typeof toolUseResult !== 'string') {
+        } else if (!block.is_error && typeof toolUseResult !== "string") {
           const toolUseInfo = claudeToolUseMap.get(toolUseId);
-          if (toolUseInfo && (toolUseInfo.tool === 'Edit' || toolUseInfo.tool === 'Write') && toolUseInfo.path) {
+          if (
+            toolUseInfo &&
+            (toolUseInfo.tool === "Edit" || toolUseInfo.tool === "Write") &&
+            toolUseInfo.path
+          ) {
             events.push({
-              type: 'file_write',
-              agent: 'claude',
+              type: "file_write",
+              agent: "claude",
               path: toolUseInfo.path,
-              timestamp: timestamp,
+              timestamp: timestamp
             });
             claudeToolUseMap.delete(toolUseId);
           } else {
             events.push({
-              type: 'tool_result',
-              agent: 'claude',
+              type: "tool_result",
+              agent: "claude",
               tool_use_id: toolUseId,
               success: true,
-              timestamp: timestamp,
+              timestamp: timestamp
             });
             if (toolUseInfo) {
               claudeToolUseMap.delete(toolUseId);
             }
           }
-        } else if (block.is_error || (typeof toolUseResult === 'string' && toolUseResult.startsWith('Error:'))) {
+        } else if (
+          block.is_error ||
+          (typeof toolUseResult === "string" && toolUseResult.startsWith("Error:"))
+        ) {
           events.push({
-            type: 'error',
-            agent: 'claude',
-            message: block.content || (typeof toolUseResult === 'string' ? toolUseResult : ''),
-            timestamp: timestamp,
+            type: "error",
+            agent: "claude",
+            message: block.content || (typeof toolUseResult === "string" ? toolUseResult : ""),
+            timestamp: timestamp
           });
         } else {
           const toolUseInfo = claudeToolUseMap.get(toolUseId);
           events.push({
-            type: 'tool_result',
-            agent: 'claude',
+            type: "tool_result",
+            agent: "claude",
             tool_use_id: toolUseId,
             success: !block.is_error,
-            timestamp: timestamp,
+            timestamp: timestamp
           });
           if (toolUseInfo) {
             claudeToolUseMap.delete(toolUseId);
@@ -683,164 +781,213 @@ function normalizeClaude(raw: any): any[] {
       }
     }
 
-    return events.length > 0 ? events : [{
-      type: eventType,
-      agent: 'claude',
-      raw: raw,
-      timestamp: timestamp,
-    }];
-  } else if (eventType === 'result') {
-    return [{
-      type: 'result',
-      agent: 'claude',
-      status: subtype || 'success',
-      duration_ms: raw.duration_ms,
-      timestamp: timestamp,
-    }];
+    return events.length > 0
+      ? events
+      : [
+          {
+            type: eventType,
+            agent: "claude",
+            raw: raw,
+            timestamp: timestamp
+          }
+        ];
+  } else if (eventType === "result") {
+    return [
+      {
+        type: "result",
+        agent: "claude",
+        status: subtype || "success",
+        duration_ms: raw.duration_ms,
+        timestamp: timestamp
+      }
+    ];
   }
 
-  return [{
-    type: eventType,
-    agent: 'claude',
-    raw: raw,
-    timestamp: timestamp,
-  }];
+  return [
+    {
+      type: eventType,
+      agent: "claude",
+      raw: raw,
+      timestamp: timestamp
+    }
+  ];
 }
 
 // --- OpenCode parsing ---
 // OpenCode outputs JSON events with step_start, tool_use, text, step_finish types
 
 function normalizeOpencode(raw: any): any[] {
-  if (!raw || typeof raw !== 'object') {
-    return [{
-      type: 'unknown',
-      agent: 'opencode',
-      raw: raw,
-      timestamp: new Date().toISOString(),
-    }];
+  if (!raw || typeof raw !== "object") {
+    return [
+      {
+        type: "unknown",
+        agent: "opencode",
+        raw: raw,
+        timestamp: new Date().toISOString()
+      }
+    ];
   }
 
-  const eventType = raw?.type || 'unknown';
-  const timestamp = raw?.timestamp ? new Date(raw.timestamp).toISOString() : new Date().toISOString();
+  const eventType = raw?.type || "unknown";
+  const timestamp = raw?.timestamp
+    ? new Date(raw.timestamp).toISOString()
+    : new Date().toISOString();
   const part = raw?.part || {};
 
-  if (eventType === 'step_start' || eventType === 'step-start') {
-    return [{
-      type: 'init',
-      agent: 'opencode',
-      session_id: part?.sessionID || null,
-      timestamp: timestamp,
-    }];
+  if (eventType === "step_start" || eventType === "step-start") {
+    return [
+      {
+        type: "init",
+        agent: "opencode",
+        session_id: part?.sessionID || null,
+        timestamp: timestamp
+      }
+    ];
   }
 
-  if (eventType === 'tool_use') {
-    const toolName = part?.tool || 'unknown';
+  if (eventType === "tool_use") {
+    const toolName = part?.tool || "unknown";
     const state = part?.state || {};
     const input = state?.input || {};
-    const status = state?.status || 'unknown';
+    const status = state?.status || "unknown";
 
     const events: any[] = [];
 
-    if (toolName === 'bash' && input?.command) {
+    if (toolName === "bash" && input?.command) {
       events.push({
-        type: 'bash',
-        agent: 'opencode',
+        type: "bash",
+        agent: "opencode",
         tool: toolName,
         command: input.command,
-        timestamp: timestamp,
+        timestamp: timestamp
       });
 
       const [filesRead, filesWritten, filesDeleted] = extractFileOpsFromBash(input.command);
       for (const path of filesRead) {
-        events.push({ type: 'file_read', agent: 'opencode', tool: 'bash', path, command: input.command, timestamp });
+        events.push({
+          type: "file_read",
+          agent: "opencode",
+          tool: "bash",
+          path,
+          command: input.command,
+          timestamp
+        });
       }
       for (const path of filesWritten) {
-        events.push({ type: 'file_write', agent: 'opencode', tool: 'bash', path, command: input.command, timestamp });
+        events.push({
+          type: "file_write",
+          agent: "opencode",
+          tool: "bash",
+          path,
+          command: input.command,
+          timestamp
+        });
       }
       for (const path of filesDeleted) {
-        events.push({ type: 'file_delete', agent: 'opencode', tool: 'bash', path, command: input.command, timestamp });
+        events.push({
+          type: "file_delete",
+          agent: "opencode",
+          tool: "bash",
+          path,
+          command: input.command,
+          timestamp
+        });
       }
 
       return events;
     }
 
-    const filePath = input?.path || input?.file_path || '';
+    const filePath = input?.path || input?.file_path || "";
 
-    if (toolName === 'edit_file' || toolName === 'write_file' || toolName === 'create_file') {
+    if (toolName === "edit_file" || toolName === "write_file" || toolName === "create_file") {
       if (filePath.trim()) {
-        return [{
-          type: 'file_write',
-          agent: 'opencode',
-          tool: toolName,
-          path: filePath,
-          timestamp: timestamp,
-        }];
+        return [
+          {
+            type: "file_write",
+            agent: "opencode",
+            tool: toolName,
+            path: filePath,
+            timestamp: timestamp
+          }
+        ];
       }
     }
 
-    if (toolName === 'read_file' || toolName === 'view_file') {
+    if (toolName === "read_file" || toolName === "view_file") {
       if (filePath.trim()) {
-        return [{
-          type: 'file_read',
-          agent: 'opencode',
-          tool: toolName,
-          path: filePath,
-          timestamp: timestamp,
-        }];
+        return [
+          {
+            type: "file_read",
+            agent: "opencode",
+            tool: toolName,
+            path: filePath,
+            timestamp: timestamp
+          }
+        ];
       }
     }
 
-    if (toolName === 'delete_file' || toolName === 'remove_file') {
+    if (toolName === "delete_file" || toolName === "remove_file") {
       if (filePath.trim()) {
-        return [{
-          type: 'file_delete',
-          agent: 'opencode',
-          tool: toolName,
-          path: filePath,
-          timestamp: timestamp,
-        }];
+        return [
+          {
+            type: "file_delete",
+            agent: "opencode",
+            tool: toolName,
+            path: filePath,
+            timestamp: timestamp
+          }
+        ];
       }
     }
 
-    return [{
-      type: 'tool_use',
-      agent: 'opencode',
-      tool: toolName,
-      args: input,
-      timestamp: timestamp,
-    }];
+    return [
+      {
+        type: "tool_use",
+        agent: "opencode",
+        tool: toolName,
+        args: input,
+        timestamp: timestamp
+      }
+    ];
   }
 
-  if (eventType === 'text') {
-    const text = part?.text || '';
-    return [{
-      type: 'message',
-      agent: 'opencode',
-      content: text,
-      complete: true,
-      timestamp: timestamp,
-    }];
+  if (eventType === "text") {
+    const text = part?.text || "";
+    return [
+      {
+        type: "message",
+        agent: "opencode",
+        content: text,
+        complete: true,
+        timestamp: timestamp
+      }
+    ];
   }
 
-  if (eventType === 'step_finish' || eventType === 'step-finish') {
-    const reason = part?.reason || 'unknown';
-    const status = reason === 'stop' ? 'success' : (reason === 'error' ? 'error' : 'success');
-    return [{
-      type: 'result',
-      agent: 'opencode',
-      status: status,
-      cost: part?.cost || 0,
-      tokens: part?.tokens || {},
-      timestamp: timestamp,
-    }];
+  if (eventType === "step_finish" || eventType === "step-finish") {
+    const reason = part?.reason || "unknown";
+    const status = reason === "stop" ? "success" : reason === "error" ? "error" : "success";
+    return [
+      {
+        type: "result",
+        agent: "opencode",
+        status: status,
+        cost: part?.cost || 0,
+        tokens: part?.tokens || {},
+        timestamp: timestamp
+      }
+    ];
   }
 
-  return [{
-    type: eventType,
-    agent: 'opencode',
-    raw: raw,
-    timestamp: timestamp,
-  }];
+  return [
+    {
+      type: eventType,
+      agent: "opencode",
+      raw: raw,
+      timestamp: timestamp
+    }
+  ];
 }
 
 // --- Copilot parsing ---
@@ -849,41 +996,49 @@ function normalizeOpencode(raw: any): any[] {
 // This normalizer is a future-proof stub for when copilot gains structured output.
 
 function normalizeCopilot(raw: any): any[] {
-  if (!raw || typeof raw !== 'object') {
-    return [{
-      type: 'unknown',
-      agent: 'copilot',
-      raw: raw,
-      timestamp: new Date().toISOString(),
-    }];
+  if (!raw || typeof raw !== "object") {
+    return [
+      {
+        type: "unknown",
+        agent: "copilot",
+        raw: raw,
+        timestamp: new Date().toISOString()
+      }
+    ];
   }
 
-  const eventType = raw?.type || 'unknown';
+  const eventType = raw?.type || "unknown";
   const timestamp = raw?.timestamp || new Date().toISOString();
 
-  if (eventType === 'message') {
-    return [{
-      type: 'message',
-      agent: 'copilot',
-      content: raw?.content || '',
-      complete: true,
-      timestamp: timestamp,
-    }];
-  } else if (eventType === 'result') {
-    return [{
-      type: 'result',
-      agent: 'copilot',
-      status: raw?.status || 'success',
-      timestamp: timestamp,
-    }];
+  if (eventType === "message") {
+    return [
+      {
+        type: "message",
+        agent: "copilot",
+        content: raw?.content || "",
+        complete: true,
+        timestamp: timestamp
+      }
+    ];
+  } else if (eventType === "result") {
+    return [
+      {
+        type: "result",
+        agent: "copilot",
+        status: raw?.status || "success",
+        timestamp: timestamp
+      }
+    ];
   }
 
-  return [{
-    type: eventType,
-    agent: 'copilot',
-    raw: raw,
-    timestamp: timestamp,
-  }];
+  return [
+    {
+      type: eventType,
+      agent: "copilot",
+      raw: raw,
+      timestamp: timestamp
+    }
+  ];
 }
 
 export function parseEvent(agentType: AgentType, line: string): any[] | null {
