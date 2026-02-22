@@ -209,6 +209,69 @@ Protect API endpoints.
 Spawn(mode='ralph', cwd='./my-project', prompt='Build the auth system')
 ```
 
+## CLI Commands
+
+In addition to running as an MCP server, `agents-mcp` exposes CLI subcommands for monitoring agents without requiring an active MCP connection. This is useful for orchestrators that need to track background agents.
+
+### `agents-mcp status`
+
+Instant, non-blocking status check. Reads agent metadata directly from `~/.agents/swarm/agents/` and returns JSON immediately.
+
+```bash
+agents-mcp status --task <name>
+```
+
+| Option | Required | Description |
+| ------ | -------- | ----------- |
+| `--task <name>` | Yes | Task name to check |
+| `--help` | No | Show help |
+
+**Output:** JSON summary of all agents in the task (status, files changed, last messages).
+
+### `agents-mcp wait`
+
+Polls until all agents in the task complete or a timeout is reached.
+
+```bash
+agents-mcp wait --task <name> [--timeout <ms>]
+```
+
+| Option | Required | Description |
+| ------ | -------- | ----------- |
+| `--task <name>` | Yes | Task name to wait on |
+| `--timeout <ms>` | No | Maximum wait time in milliseconds (default: 300000, max: 600000) |
+| `--help` | No | Show help |
+
+### Exit codes
+
+| Code | Meaning |
+| ---- | ------- |
+| `0` | All agents completed successfully |
+| `1` | Timeout or error |
+| `2` | No agents found for the task |
+
+### Non-blocking monitoring pattern
+
+For platforms that need to stay responsive while waiting for agents, run `wait` in the background:
+
+```bash
+# Claude Code: background monitoring while staying responsive to user input
+Bash(run_in_background=true, command="agents-mcp wait --task my-task --timeout 300000")
+
+# Any platform: instant non-blocking check
+agents-mcp status --task my-task
+```
+
+This pattern lets orchestrators dispatch agents and continue handling input while background monitoring notifies when work is done.
+
+### Default behavior (no subcommand)
+
+Running `agents-mcp` without a subcommand starts the MCP server as before — existing behavior is unchanged.
+
+```bash
+agents-mcp   # starts MCP server
+```
+
 ## What This Server Does NOT Do
 
 | Not This            | That's The Orchestrator's Job            |
