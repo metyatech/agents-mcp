@@ -347,6 +347,18 @@ Data lives at `~/.agents/`:
 - Gemini: `--yolo`
 - Cursor: `-f`
 
+## Development
+
+```bash
+npm install          # install dependencies (also sets up husky pre-commit hooks via prepare)
+npm run verify       # lint + format:check + typecheck + test + build
+npm run format       # auto-fix formatting with prettier
+npm test             # run tests only
+npm run build        # compile TypeScript
+```
+
+A pre-commit hook (`npm run verify`) runs automatically on every commit via [husky](https://typicode.github.io/husky/). Commits that fail lint, formatting, typecheck, tests, or build are blocked.
+
 ## Configuration
 
 Config lives at `~/.agents/swarm/config.json`. See [AGENTS.md](./AGENTS.md) for full config reference.
