@@ -21,6 +21,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/agent-rules-composition.m
 - AGENTS.md is self-contained; do not rely on parent/child AGENTS for inheritance or precedence.
 - Maintain shared rules centrally and compose per project; use project-local rules only for truly local policies.
 - Place AGENTS.md at the project root; only add another AGENTS.md for nested independent projects.
+- Before doing any work in a repository that contains `agent-ruleset.json`, run `compose-agentsmd` in that repository to refresh its AGENTS.md and ensure rules are current.
 
 ## Update policy
 
@@ -28,7 +29,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/agent-rules-composition.m
 - A request to "update rules" means: update the appropriate rule module and ruleset, then regenerate AGENTS.md.
 - If the user gives a persistent instruction (e.g., "always", "must"), encode it in the appropriate module (global vs local).
 - When acknowledging a new persistent instruction, update the rule module in the same change set and regenerate AGENTS.md.
-- When creating a new repository, set up rule files (e.g., agent-ruleset.json and any local rules) so compose-agentsmd can run.
+- When creating a new repository, verify that it meets all applicable global rules before reporting completion: rule files and AGENTS.md, CI workflow, linting/formatting, community health files, documentation, and dependency scanning. Do not treat repository creation as complete until full compliance is verified.
 - When updating rules, infer the core intent; if it is a global policy, record it in global rules rather than project-local rules.
 - If a task requires domain rules not listed in agent-ruleset.json, update the ruleset to include them and regenerate AGENTS.md before proceeding.
 - Do not include composed `AGENTS.md` diffs in the final response unless the user explicitly asks for them.
@@ -38,6 +39,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/agent-rules-composition.m
 - Keep rules MECE, concise, and non-redundant.
 - Use short, action-oriented bullets; avoid numbered lists unless order matters.
 - Prefer the most general applicable rule to avoid duplication.
+- Write rules as clear directives that prescribe specific behavior ("do X", "always Y", "never Z"). Do not use hedging language ("may", "might", "could", "consider") — if a behavior is required, state it as a requirement; if it is not required, omit it.
 - Do not use numeric filename prefixes (e.g., `00-...`) to impose ordering; treat rule modules as a flat set. If ordering matters, encode it explicitly in composition/tooling rather than filenames.
 
 ## Rule placement (global vs domain)
@@ -68,7 +70,8 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/autonomous-operations.md
 - Assume end-to-end autonomy for repository operations (issue triage, PRs, direct pushes to main/master, merges, releases, repo admin) only within repositories under the user's control (e.g., owned by metyatech or where the user has explicit maintainer/push authority), unless the user restricts scope; for third-party repos, require explicit user request before any of these operations.
 - Do not preserve backward compatibility unless explicitly requested; avoid legacy aliases and compatibility shims by default.
 - When work reveals rule gaps, redundancy, or misplacement, proactively update rule modules/rulesets (including moves/renames) and regenerate AGENTS.md without waiting for explicit user requests.
-- After each task, briefly assess whether avoidable mistakes occurred. In direct mode, propose rule updates if warranted. In delegated mode, include improvement suggestions in the task result.
+- Continuously evaluate your own behavior, rules, and skills during operation. When you identify a gap, ambiguity, inefficiency, or missing guidance — whether through self-observation, task friction, or comparison with ideal behavior — update the appropriate rule or skill immediately without waiting for the user to notice or point out the issue. After each task, assess whether avoidable mistakes occurred and apply corrections in the same task. In delegated mode, include improvement suggestions in the task result.
+- When the user points out a behavior failure, treat it as a systemic gap: fix the immediate issue, update rules to prevent recurrence, and identify whether the same gap pattern applies elsewhere — all in a single action. Do not wait for the user to enumerate each corrective step; a single observation implies all necessary corrections.
 - If you state a persistent workflow change (e.g., `from now on`, `I'll always`), immediately propose the corresponding rule update and request approval in the same task; do not leave it as an unrecorded promise. This is a blocking gate: do not proceed to the next task or close the response until the rule update is committed or explicitly deferred by the requester. When operating under a multi-agent-delegation model, follow that rule module's guidance on restricted operations before proposing changes.
 - Because session memory resets between tasks, treat rule files as persistent memory; when any issue or avoidable mistake occurs, update rules in the same task to prevent recurrence.
 - Never apply rules from memory of previous sessions; always reference the current AGENTS.md. If unsure whether a rule still applies, re-read it.
@@ -99,7 +102,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/command-execution.md
 - Prefer repository-standard scripts/commands (package.json scripts, README instructions).
 - Reproduce reported command issues by running the same command (or closest equivalent) before proposing fixes.
 - Avoid interactive git prompts by using --no-edit or setting GIT_EDITOR=true.
-- If elevated privileges are required, use sudo where available; otherwise run as Administrator.
+- If elevated privileges are required, use sudo directly; do not launch a separate elevated shell (e.g., Start-Process -Verb RunAs). Fall back to run as Administrator only when sudo is unavailable.
 - Keep changes scoped to affected repositories; when shared modules change, update consumers and verify at least one.
 - If no branch is specified, work on the current branch; direct commits to main/master are allowed.
 - Do not assume agent platform capabilities beyond what is available; fail explicitly when unavailable.
@@ -159,7 +162,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/implementation-and-coding
 - When selecting a UI framework, prioritize built-in component quality and default aesthetics over raw flexibility; the goal is a standard, modern-looking UI with minimal custom styling code.
 - Keep everything DRY across code, specs, docs, tests, configs, and scripts; proactively refactor repeated procedures into shared configs/scripts with small, local overrides.
 - Persist durable runtime/domain data in a database with a fully normalized schema (3NF/BCNF target): store each fact once with keys/constraints, and compute derived statuses/views at read time instead of duplicating them.
-- Fix root causes; remove obsolete/unused code, branches, comments, and helpers.
+- Fix root causes; remove obsolete/unused code, branches, comments, and helpers. When a tool, dependency, or service under user control malfunctions, investigate and fix the source rather than building workarounds. User-owned repositories are fixable code, not external constraints.
 - Avoid leaving half-created state on failure paths. Any code that allocates/registers/starts resources must have a shared teardown that runs on all failure and cancellation paths.
 - Do not block inside async APIs or async-looking code paths; avoid synchronous I/O and synchronous process execution where responsiveness is expected.
 - Avoid external command execution (PATH-dependent tools, stringly-typed argument concatenation). Prefer native libraries/SDKs. If unavoidable: use absolute paths, safe argument handling, and strict input validation.
@@ -169,6 +172,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/implementation-and-coding
 - Align file/folder names with their contents and keep naming conventions consistent.
 - Do not assume machine-specific environments (fixed workspace directories, drive letters, per-PC paths). Prefer repo-relative paths and explicit configuration so workflows work in arbitrary clone locations.
 - Temporary files/directories created by the agent MUST be placed only under the OS temp directory (e.g., `%TEMP%` / `$env:TEMP`). Do not create ad-hoc temp folders in repos/workspaces unless the requester explicitly approves.
+- When building tools, CLIs, or services intended for agent use, design for cross-agent compatibility. Do not rely on features specific to a single agent platform (Claude Code, Codex, Gemini CLI, Copilot). Use standard interfaces (CLI, HTTP, stdin/stdout, MCP) that any agent can invoke.
 
 Source: github:metyatech/agent-rules@HEAD/rules/global/linting-formatting-and-static-analysis.md
 
@@ -182,6 +186,111 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/linting-formatting-and-st
 - Pin tool versions (lockfiles/manifests) for reproducible CI.
 - For web UI projects, enforce automated visual accessibility checks in CI.
 - Require dependency vulnerability scanning, secret scanning, and CodeQL for supported languages.
+
+Source: github:metyatech/agent-rules@HEAD/rules/global/model-inventory.md
+
+# Model inventory and routing
+
+Update this table when models change. **Last reviewed: 2026-02-22.**
+
+## Tier definitions
+
+- **Free** — Trivial lookups, simple Q&A, straightforward single-file edits. Copilot only.
+- **Light** — Mechanical transforms, formatting, simple implementations, quick clarifications.
+- **Standard** — General implementation, code review, multi-file changes, most development work.
+- **Heavy** — Architecture decisions, safety-critical code, complex multi-step reasoning.
+- **Large Context** — Tasks requiring >200k token input.
+
+Classify each task into a tier, then pick an agent with available quota and select the ★ preferred model for that tier. Fall back to other models in the same tier when the preferred model's agent has no quota.
+
+## Claude
+
+| Tier | Model | Effort | Notes |
+|------|-------|--------|-------|
+| Light | claude-haiku-4-5-20251001 | — | Effort not supported; SWE-bench 73% |
+| Standard | claude-sonnet-4-6 | medium | ★ Default; SWE-bench 80% |
+| Heavy | claude-opus-4-6 | high | SWE-bench 81%; `max` effort for hardest tasks |
+
+Effort levels: `low` / `medium` / `high` (Opus also supports `max`).
+
+## Codex
+
+| Tier | Model | Effort | Notes |
+|------|-------|--------|-------|
+| Light | gpt-5.1-codex-mini | medium | `medium`/`high` only |
+| Standard | gpt-5.3-codex | medium | ★ Latest flagship; SWE-bench Pro 57% |
+| Standard | gpt-5.2-codex | medium | Previous gen; SWE-bench Pro 56% |
+| Standard | gpt-5.2 | medium | General-purpose; best non-codex reasoning; SWE-bench 80% |
+| Heavy | gpt-5.3-codex | xhigh | ★ Best codex at max effort |
+| Heavy | gpt-5.1-codex-max | xhigh | Extended reasoning; context compaction |
+| Heavy | gpt-5.2-codex | xhigh | Alternative |
+| Heavy | gpt-5.2 | xhigh | General reasoning fallback |
+
+Effort levels: `low` / `medium` / `high` / `xhigh` (gpt-5.1-codex-mini: `medium` / `high` only).
+
+## Gemini
+
+| Tier | Model | Effort | Notes |
+|------|-------|--------|-------|
+| Light | gemini-3-flash-preview | — | SWE-bench 78%; strong despite Light tier |
+| Standard | gemini-3-pro-preview | — | ★ 1M token context; SWE-bench 76% |
+| Large Context | gemini-3-pro-preview | — | >200k token tasks; 1M context |
+
+Effort not supported. When `gemini-3-1-pro-preview` becomes available in Gemini CLI, promote it to Standard (SWE-bench 81%).
+
+## Copilot
+
+Copilot charges different quota per model. Prefer lower-multiplier models when task complexity allows. Effort is not configurable (ignored).
+
+| Tier | Model | Quota | Notes |
+|------|-------|-------|-------|
+| Free | gpt-5-mini | 0x | ★ SWE-bench ~70%; simple tasks |
+| Free | gpt-4.1 | 0x | 1M context; SWE-bench 55% |
+| Light | claude-haiku-4-5 | 0.33x | ★ SWE-bench 73% |
+| Light | gpt-5.1-codex-mini | 0.33x | Mechanical transforms |
+| Standard | claude-sonnet-4-6 | 1x | ★ Default; SWE-bench 80% |
+| Standard | gpt-5.3-codex | 1x | Latest codex flagship |
+| Standard | gpt-5.2 | 1x | Best general reasoning; SWE-bench 80% |
+| Standard | gpt-5.2-codex | 1x | Agentic coding |
+| Standard | gpt-5.1-codex-max | 1x | Extended reasoning; compaction |
+| Standard | claude-sonnet-4-5 | 1x | SWE-bench 77%; prefer 4.6 |
+| Standard | gpt-5.1-codex | 1x | SWE-bench 77% |
+| Standard | gpt-5.1 | 1x | General purpose; SWE-bench ~76% |
+| Standard | gemini-3-pro | 1x | 1M context; SWE-bench 76% |
+| Standard | claude-sonnet-4 | 1x | Legacy; SWE-bench 73%; last choice |
+| Heavy | claude-opus-4-6 | 3x | ★ SWE-bench 81% |
+| Heavy | claude-opus-4-5 | 3x | SWE-bench 81%; prefer 4.6 |
+| — | claude-opus-4-6 fast | 30x | Avoid; excessive quota cost |
+
+## Routing principles
+
+- All agents (claude, codex, gemini, copilot) operate on independent flat-rate subscriptions with periodic quota limits. Route by model quality, quota conservation, and quota distribution.
+- All agents can execute code, modify files, and perform multi-step tasks. Route by model quality and quota, not by execution capability.
+- Spread work across agents to maximize total throughput.
+- For large-context tasks (>200k tokens), prefer Gemini (1M token context).
+- For trivial tasks, prefer Copilot free-tier models (0x quota) before consuming other agents' quota.
+- When multiple agents can handle a task equally well, prefer the one with the most remaining quota.
+- Before selecting or spawning any sub-agent, run `ai-quota` to check availability — mandatory. If `ai-quota` is unavailable or fails, report the inability and stop; do not spawn any sub-agent without quota verification.
+
+## Quota fallback logic
+
+If the primary agent has no remaining quota:
+
+1. Query quota for all agents.
+2. Select any agent with available quota that has a model at the required tier.
+3. For Copilot fallback, prefer lower-multiplier models to conserve quota.
+4. If the fallback model is significantly less capable, note the degradation in the dispatch report.
+5. If no agent has quota, queue the task and report the block immediately; do not drop silently.
+
+## Routing decision sequence
+
+1. Classify the task tier (Free / Light / Standard / Heavy / Large Context).
+2. For Free tier: dispatch to Copilot with a 0x model. Skip quota check.
+3. For other tiers: check quota for all agents via `ai-quota`.
+4. Pick the agent with available quota at the required tier; prefer the agent with the most remaining quota when multiple qualify.
+5. Set `agent_type`, `model`, and `effort` from the tables above (omit `effort` when column shows —).
+6. If primary choice has no quota: apply fallback logic.
+7. Include the chosen agent, model, tier, and effort in the dispatch report.
 
 Source: github:metyatech/agent-rules@HEAD/rules/global/multi-agent-delegation.md
 
@@ -207,6 +316,7 @@ When operating in delegated mode:
 
 - Delegated agents MUST treat the delegator as the requester and MUST NOT ask the human user for plan approval. If blocked by repo rules, escalate to the delegator (not the human).
 - Delegating prompts MUST explicitly state delegated mode and whether plan approval is already granted; include AC and verification requirements.
+- Agents spawned in a repository read that repository's AGENTS.md and follow all rules automatically. Do not duplicate rule content in delegation prompts; focus prompts on the task description, context, and acceptance criteria.
 
 ## Read-only / no-write claims
 
@@ -235,6 +345,7 @@ The following operations require explicit delegation from the delegating agent o
 
 ## Cost optimization (model selection)
 
+- When spawning agents, always explicitly specify `model` and `effort` (where supported). Never rely on defaults; defaulting wastes budget by over-provisioning.
 - When spawning agents, minimize the **total cost to achieve the goal**. Total cost includes model pricing, reasoning/thinking token consumption, context usage, and retry overhead.
 - Use the minimum reasoning effort level (e.g., low/medium/high/xhigh) that reliably produces correct output for the task; extended reasoning increases cost significantly.
 - Prefer newer-generation models at lower reasoning effort over older models at maximum reasoning effort when both can succeed; newer models often achieve equal quality with less thinking overhead.
@@ -301,12 +412,13 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/planning-and-approval-gat
 
 ## Reviewer proxy approval
 
-- When operating as an autonomous orchestrator with the user-proxy skill, the orchestrator MAY approve plans on behalf of the user for operations within user-owned repositories.
+- When the autonomous-orchestrator skill is active, the skill invocation itself constitutes blanket approval for all operations within user-owned repositories. The orchestrator MUST approve plans via reviewer proxy without asking the human user.
 - The reviewer proxy evaluates plans against all rules, known error patterns, and quality standards before approving.
 - If the reviewer proxy approves (all checklist items pass), proceed without human approval.
 - If the reviewer proxy flags concerns, escalate to the human user.
 - The human user may override or interrupt at any time; user messages always take priority.
-- Reviewer proxy does NOT apply to restricted operations (creating/deleting repositories, force-pushing, rewriting published git history, modifying rules) — these always require human approval per Multi-agent delegation rules.
+- Reviewer proxy does NOT apply to restricted operations (creating/deleting repositories, force-pushing, rewriting published git history) — these always require human approval per Multi-agent delegation rules.
+- During autonomous operation, the orchestrator applies rule modifications directly when the reviewer proxy confirms they are safe and consistent with existing policies. Escalate to the human user only if the change conflicts with existing rules or carries ambiguous risk.
 
 Source: github:metyatech/agent-rules@HEAD/rules/global/post-change-deployment.md
 
@@ -352,6 +464,8 @@ For AC definition, verification evidence, regression tests, and final reporting 
 - If pre-commit hooks cannot be installed (environment restriction, no supported tool), manually run the repo's full verify command before every commit and confirm it passes; do not proceed to `git commit` until verify succeeds.
 - Never disable checks, weaken assertions, loosen types, or add retries solely to make checks pass.
 - If the execution environment restricts test execution (no network, no database, sandboxed), run the available subset, document what was skipped, and ensure CI covers the remainder.
+- When delivering a user-facing tool or GUI, perform end-to-end manual verification (start the service, exercise each feature, confirm correct behavior) in addition to automated tests. Do not rely solely on unit tests for user-facing deliverables.
+- When manual testing reveals issues or unexpected behavior, convert those findings into automated tests before fixing; the test must fail before the fix and pass after.
 
 ## Tests
 
@@ -381,6 +495,21 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/release-and-publication.m
 - Keep package version and Git tag consistent.
 - Run dependency security checks before release.
 - Verify published packages resolve and run correctly before reporting done.
+
+## Public repository metadata
+
+- For public repos, set GitHub Description, Topics, and Homepage.
+- Assign Topics from the standard set below. Every repo must have at least one standard topic when applicable; repos that do not match any standard topic use descriptive topics relevant to their domain.
+  - `agent-skill`: repo contains a SKILL.md (an installable agent skill).
+  - `agent-tool`: CLI tool or MCP server used by agents (e.g., task-tracker, agents-mcp, compose-agentsmd).
+  - `agent-rule`: rule source or ruleset repository (e.g., agent-rules).
+  - `unreal-engine`: Unreal Engine plugin or sample project.
+  - `qti`: QTI assessment ecosystem tool or library.
+  - `education`: course content, teaching materials, or student-facing platform.
+  - `docusaurus`: Docusaurus plugin or extension.
+- Additional descriptive topics (language, framework, domain keywords) may be added freely alongside standard topics.
+- Review and update the standard topic set when the repository landscape changes materially (new domain clusters emerge or existing ones become obsolete).
+- Verify topics are set as part of the new-repository compliance gate.
 
 ## Delivery chain gate
 
@@ -450,6 +579,57 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/task-lifecycle-tracking.m
 - If `task-tracker` is not installed, install it via `npm install -g @metyatech/task-tracker` before proceeding.
 - The task-tracker state file (`.tasks.jsonl`) must be committed to version control; do not add it to `.gitignore`.
 
+Source: github:metyatech/agent-rules@HEAD/rules/global/thread-inbox.md
+
+# Thread inbox
+
+- `thread-inbox` is the persistent cross-session conversation context tracker. Use it to preserve discussion topics, decisions, and context that span sessions.
+- If `thread-inbox` is not installed, install it via `npm install -g @metyatech/thread-inbox` before proceeding.
+- Store `.threads.jsonl` in the workspace root directory (use `--dir <workspace-root>`). Do not commit it to version control; it is local conversation context, not project state.
+
+## Status model
+
+Thread status is explicit (set by commands, not auto-computed):
+
+- `active` — open, no specific action pending.
+- `waiting` — user sent a message; AI should respond. Auto-set when adding `--from user` messages.
+- `needs-reply` — AI needs user input or decision. Set via `--status needs-reply`.
+- `review` — AI reporting completion; user should review. Set via `--status review`.
+- `resolved` — closed.
+
+## Session start
+
+- Run `thread-inbox inbox --dir <workspace-root>` to find threads needing user action (`needs-reply` and `review`).
+- Run `thread-inbox list --status waiting --dir <workspace-root>` to find threads needing agent attention.
+- Report findings before starting new work.
+
+## When to create threads
+
+- Create a thread when a new discussion topic, design decision, or multi-session initiative emerges.
+- Do not create threads for tasks already tracked by `task-tracker`; threads are for context and decisions, not work items.
+- Thread titles should be concise topic descriptions (e.g., "CI strategy for skill repos", "thread-inbox design approach").
+
+## When to add messages
+
+- Add a `--from user` message for any substantive user interaction: decisions, preferences, directions, questions, status checks, feedback, and approvals. Thread-inbox is the only cross-session persistence mechanism for conversation context; err on the side of recording rather than omitting. Status auto-sets to `waiting`.
+- Add a `--from ai` message for informational updates (progress, notes). Status does not change by default.
+- Add a `--from ai --status needs-reply` message when asking the user a question or requesting a decision.
+- Add a `--from ai --status review` message when reporting task completion or results that need user review.
+- Record the user's actual words as `--from user`, not a third-person summary or paraphrase. Record the AI's actual response as `--from ai`. The thread should read as a conversation transcript, not meeting minutes.
+
+## Thread lifecycle
+
+- Resolve threads when the topic is fully addressed or the decision is implemented and recorded in rules.
+- Reopen threads if the topic resurfaces.
+- Periodically purge resolved threads to keep the inbox clean.
+
+## Relationship to other tools
+
+- `task-tracker`: Tracks actionable work items with lifecycle stages. Use for "what to do."
+- `thread-inbox`: Tracks discussion context and decisions. Use for "what was discussed/decided."
+- AGENTS.md rules: Persistent invariants and constraints. Use for "how to behave."
+- If a thread captures a persistent behavioral preference, encode it as a rule and resolve the thread.
+
 Source: github:metyatech/agent-rules@HEAD/rules/global/user-identity-and-accounts.md
 
 # User identity and accounts
@@ -471,6 +651,8 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/writing-and-documentation
 - After completing a response, emit the Windows SystemSounds.Asterisk sound via PowerShell only when operating in direct mode (top-level agent).
 - If operating in delegated mode (spawned by another agent / sub-agent), do not emit notification sounds.
 - If operating as a manager/orchestrator, do not ask delegated sub-agents to emit sounds; emit at most once when the overall task is complete (direct mode only).
+
+- When delivering a new tool, feature, or artifact to the user, explain what it is, how to use it (with example commands), and what its key capabilities are. Do not report only completion status; always include a usage guide in the same response.
 
 ## Developer-facing writing
 
