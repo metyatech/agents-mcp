@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "agents-mcp": "./dist/cli.js"
+    "agents-mcp": "dist/cli.js"
   },
   "files": [
     "dist"
@@ -34,7 +34,7 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.27.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
@@ -47,7 +47,16 @@
     "prettier": "^3.4.0",
     "tsx": "^4.19.0",
     "typescript": "^5.3.0",
-    "vitest": "^2.0.0"
+    "vitest": "^3.0.0"
+  },
+  "overrides": {
+    "minimatch": "^10.2.2",
+    "@modelcontextprotocol/sdk": {
+      "ajv": "^8.18.0"
+    },
+    "qs": "^6.15.0",
+    "hono": "^4.12.2",
+    "esbuild": "^0.25.0"
   },
   "keywords": [
     "mcp",
