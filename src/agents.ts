@@ -109,15 +109,21 @@ export function buildWindowsSpawnPs1(
     // Close stdin immediately so child processes that check for pipeline input
     // (e.g. npm .ps1 wrappers that use $MyInvocation.ExpectingInput) don't hang.
     `$p.StandardInput.Close()`,
-    // Read both streams concurrently to avoid deadlock when stderr buffer fills.
-    `$outTask = $p.StandardOutput.ReadToEndAsync()`,
+    // Stream stdout line-by-line to the log file so readNewEvents() can track
+    // progress while the agent is still running (not just after it exits).
+    // Read stderr asynchronously in background to prevent buffer deadlock.
+    `$fs = [System.IO.StreamWriter]::new('${psEsc(stdoutPath)}', $false, $enc)`,
     `$errTask = $p.StandardError.ReadToEndAsync()`,
+    `$line = $null`,
+    `while ($null -ne ($line = $p.StandardOutput.ReadLine())) { $fs.WriteLine($line); $fs.Flush() }`,
     `$p.WaitForExit()`,
-    `[void][System.Threading.Tasks.Task]::WhenAll($outTask, $errTask)`,
+    `[void]$errTask.Wait()`,
+    `$errContent = $errTask.Result`,
+    `if ($errContent) { foreach ($errLine in $errContent.Split([Environment]::NewLine, [System.StringSplitOptions]::RemoveEmptyEntries)) { $fs.WriteLine($errLine); $fs.Flush() } }`,
     // Append a JSON sentinel line with the real exit code so readNewEvents() can
     // determine the correct COMPLETED/FAILED status without guessing.
-    `$exitJson = '{"__exit_code__":' + $p.ExitCode.ToString() + '}'`,
-    `[System.IO.File]::WriteAllText('${psEsc(stdoutPath)}', $outTask.Result + $errTask.Result + [Environment]::NewLine + $exitJson + [Environment]::NewLine, $enc)`
+    `$fs.WriteLine('{"__exit_code__":' + $p.ExitCode.ToString() + '}')`,
+    `$fs.Close()`
   ];
 
   return psLines.join("\n");
