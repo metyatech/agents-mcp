@@ -847,7 +847,15 @@ export class AgentProcess {
     try {
       process.kill(this.pid, 0);
       return true;
-    } catch {
+    } catch (err: unknown) {
+      // ESRCH means "no such process" — the process is definitely dead.
+      // EPERM means "operation not permitted" — the process EXISTS but we
+      // lack permission to signal it (common on Windows for cross-session or
+      // elevated processes). Treat EPERM as alive to avoid prematurely
+      // marking running agents as completed.
+      if (err && typeof err === "object" && "code" in err && err.code === "EPERM") {
+        return true;
+      }
       return false;
     }
   }
@@ -1642,6 +1650,7 @@ export class AgentManager {
   }
 
   async listAll(): Promise<AgentProcess[]> {
+    await this.initialize();
     const agents = Array.from(this.agents.values());
     for (const agent of agents) {
       await agent.readNewEvents();

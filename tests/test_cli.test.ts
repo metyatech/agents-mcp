@@ -2,7 +2,7 @@
  * Tests for CLI commands: getTaskAgents, runStatusCommand, runWaitCommand, parseCliArgs
  */
 
-import { describe, test, expect, beforeEach, afterEach } from "vitest";
+import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { tmpdir } from "os";
@@ -149,6 +149,49 @@ describe("getTaskAgents", () => {
 
     const [info] = await getTaskAgents("alive-task", agentsDir);
     expect(info.status).toBe("running");
+  });
+
+  test("treats EPERM as alive (process exists but permission denied)", async () => {
+    // On Windows, process.kill(pid, 0) can throw EPERM for processes in
+    // different sessions or with elevated privileges. The process is still
+    // alive; we just lack permission to signal it. Regression test: the
+    // wait command must NOT treat EPERM as "process dead" and prematurely
+    // mark the agent as completed.
+    const fakePid = 88_888_888;
+    await writeMetaJson(
+      agentsDir,
+      "eperm-agent",
+      makeMeta({
+        agent_id: "eperm-agent",
+        task_name: "eperm-task",
+        status: "running",
+        pid: fakePid,
+        completed_at: null
+      })
+    );
+
+    // Mock process.kill to throw EPERM for this specific PID
+    const originalKill = process.kill;
+    const killSpy = vi.spyOn(process, "kill").mockImplementation(((
+      pid: number,
+      signal?: string | number
+    ) => {
+      if (pid === fakePid && (signal === 0 || signal === undefined)) {
+        const err: NodeJS.ErrnoException = new Error("kill EPERM");
+        err.code = "EPERM";
+        err.errno = -4048;
+        throw err;
+      }
+      return originalKill.call(process, pid, signal as any);
+    }) as typeof process.kill);
+
+    try {
+      const [info] = await getTaskAgents("eperm-task", agentsDir);
+      // EPERM means the process exists — status must remain "running"
+      expect(info.status).toBe("running");
+    } finally {
+      killSpy.mockRestore();
+    }
   });
 
   test("computes duration correctly for completed agent", async () => {

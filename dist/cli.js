@@ -30,7 +30,8 @@ async function resolveAgentsDir() {
         return primary;
     }
     catch {
-        const fallback = path.join(tmpdir(), "agents", "swarm", "agents");
+        // Fallback must match persistence.ts: tmpdir()/agents/agents
+        const fallback = path.join(tmpdir(), "agents", "agents");
         await fs.mkdir(fallback, { recursive: true }).catch(() => { });
         return fallback;
     }
@@ -47,7 +48,15 @@ function isProcessAlive(pid) {
         process.kill(pid, 0);
         return true;
     }
-    catch {
+    catch (err) {
+        // ESRCH means "no such process" — the process is definitely dead.
+        // EPERM means "operation not permitted" — the process EXISTS but we
+        // lack permission to signal it (common on Windows for cross-session or
+        // elevated processes). Treat EPERM as alive to avoid prematurely
+        // marking running agents as completed.
+        if (err && typeof err === "object" && "code" in err && err.code === "EPERM") {
+            return true;
+        }
         return false;
     }
 }
