@@ -3,4 +3,4 @@
 {"id":"7Mcy_kgI","description":"Add .tasks.jsonl git-tracking rule to global rules","stage":"done","createdAt":"2026-02-22T12:15:42.333Z","updatedAt":"2026-02-22T12:16:29.108Z"}
 {"id":"HCvTlyoj","description":"agents-mcp: version bump 0.2.13, tag, GitHub Release, rebuild global link","stage":"done","createdAt":"2026-02-23T03:27:03.990Z","updatedAt":"2026-02-24T02:32:54.928Z"}
 {"id":"S48Urq50","description":"Write hello world output in repository","stage":"done","createdAt":"2026-02-24T02:33:51.744Z","updatedAt":"2026-02-24T02:34:39.626Z"}
-{"id":"0fr8bQAl","description":"Write hello world","stage":"pending","createdAt":"2026-02-24T02:57:19.697Z","updatedAt":"2026-02-24T02:57:19.697Z"}
+{"id":"0fr8bQAl","description":"Write hello world","stage":"done","createdAt":"2026-02-24T02:57:19.697Z","updatedAt":"2026-02-24T11:27:06.840Z"}
