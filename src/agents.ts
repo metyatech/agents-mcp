@@ -1332,7 +1332,9 @@ export class AgentManager {
 
     switch (agentType) {
       case "codex":
-        editCmd.push("--full-auto");
+        if (!editCmd.includes("--dangerously-bypass-approvals-and-sandbox")) {
+          editCmd.push("--dangerously-bypass-approvals-and-sandbox");
+        }
         break;
 
       case "cursor":

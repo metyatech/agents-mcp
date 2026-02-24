@@ -1086,7 +1086,8 @@ describe("Config-driven buildCommand", () => {
     expect(cmd).toContain("danger-full-access");
     expect(cmd).toContain("--model");
     expect(cmd).toContain("gpt-5.3-codex");
-    expect(cmd).toContain("--full-auto");
+    expect(cmd).toContain("--dangerously-bypass-approvals-and-sandbox");
+    expect(cmd).not.toContain("--full-auto");
   });
 
   test("compatible claude custom command gets required flags and settings", () => {

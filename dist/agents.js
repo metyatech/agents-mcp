@@ -1136,7 +1136,9 @@ export class AgentManager {
         const editCmd = [...cmd];
         switch (agentType) {
             case "codex":
-                editCmd.push("--full-auto");
+                if (!editCmd.includes("--dangerously-bypass-approvals-and-sandbox")) {
+                    editCmd.push("--dangerously-bypass-approvals-and-sandbox");
+                }
                 break;
             case "cursor":
                 editCmd.push("-f");
