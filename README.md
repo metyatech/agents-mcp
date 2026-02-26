@@ -233,14 +233,14 @@ agents-mcp status --task <name>
 Polls until all agents in the task complete or a timeout is reached.
 
 ```bash
-agents-mcp wait --task <name> [--timeout <ms>]
+agents-mcp wait --task <name> [--timeout <min>]
 ```
 
-| Option           | Required | Description                                                      |
-| ---------------- | -------- | ---------------------------------------------------------------- |
-| `--task <name>`  | Yes      | Task name to wait on                                             |
-| `--timeout <ms>` | No       | Maximum wait time in milliseconds (default: 300000, max: 600000) |
-| `--help`         | No       | Show help                                                        |
+| Option            | Required | Description                                                                                  |
+| ----------------- | -------- | -------------------------------------------------------------------------------------------- |
+| `--task <name>`   | Yes      | Task name to wait on                                                                         |
+| `--timeout <min>` | No       | Maximum wait time in minutes (default: 5, max: 10). Decimals allowed (e.g. 0.5 = 30 seconds) |
+| `--help`          | No       | Show help                                                                                    |
 
 ### Exit codes
 
@@ -256,7 +256,7 @@ For platforms that need to stay responsive while waiting for agents, run `wait` 
 
 ```bash
 # Claude Code: background monitoring while staying responsive to user input
-Bash(run_in_background=true, command="agents-mcp wait --task my-task --timeout 300000")
+Bash(run_in_background=true, command="agents-mcp wait --task my-task --timeout 5")
 
 # Any platform: instant non-blocking check
 agents-mcp status --task my-task

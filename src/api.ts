@@ -347,7 +347,7 @@ async function collectStatus(
 }
 
 const WAIT_POLL_INTERVAL_MS = 1000;
-const WAIT_DEFAULT_TIMEOUT_MS = 60_000;
+const WAIT_DEFAULT_TIMEOUT_MIN = 1;
 const WAIT_MAX_TIMEOUT_MS = 600_000;
 
 export async function handleStatus(
@@ -374,7 +374,7 @@ export async function handleStatus(
       : `task "${normalizedTaskName}"`;
 
   console.error(
-    `[status] Getting status for agents in ${lookupLabel} (filter=${effectiveFilter}${wait ? `, wait=true, timeout=${timeout ?? WAIT_DEFAULT_TIMEOUT_MS}ms` : ""})...`
+    `[status] Getting status for agents in ${lookupLabel} (filter=${effectiveFilter}${wait ? `, wait=true, timeout=${timeout ?? WAIT_DEFAULT_TIMEOUT_MIN}min` : ""})...`
   );
 
   let result = await collectStatus(
@@ -386,10 +386,13 @@ export async function handleStatus(
   );
 
   if (wait && result.summary.running > 0) {
-    const effectiveTimeout = Math.min(timeout ?? WAIT_DEFAULT_TIMEOUT_MS, WAIT_MAX_TIMEOUT_MS);
-    const deadline = Date.now() + effectiveTimeout;
+    const effectiveTimeoutMs = Math.min(
+      (timeout ?? WAIT_DEFAULT_TIMEOUT_MIN) * 60_000,
+      WAIT_MAX_TIMEOUT_MS
+    );
+    const deadline = Date.now() + effectiveTimeoutMs;
 
-    console.error(`[status] Waiting for running agents (deadline in ${effectiveTimeout}ms)...`);
+    console.error(`[status] Waiting for running agents (deadline in ${effectiveTimeoutMs}ms)...`);
 
     while (result.summary.running > 0 && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, WAIT_POLL_INTERVAL_MS));
@@ -404,7 +407,7 @@ export async function handleStatus(
 
     if (result.summary.running > 0) {
       console.error(
-        `[status] Wait timed out after ${effectiveTimeout}ms with ${result.summary.running} agent(s) still running`
+        `[status] Wait timed out after ${effectiveTimeoutMs}ms with ${result.summary.running} agent(s) still running`
       );
       result.timed_out = true;
     } else {

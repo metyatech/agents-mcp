@@ -455,21 +455,13 @@ describe("parseCliArgs", () => {
   });
 
   test("parses wait subcommand with --task and --timeout", () => {
-    const result = parseCliArgs([
-      "node",
-      "cli.js",
-      "wait",
-      "--task",
-      "my-task",
-      "--timeout",
-      "10000"
-    ]);
+    const result = parseCliArgs(["node", "cli.js", "wait", "--task", "my-task", "--timeout", "5"]);
     expect(result.subcommand).toBe("wait");
     expect(result.taskName).toBe("my-task");
-    expect(result.timeout).toBe(10000);
+    expect(result.timeout).toBe(300_000);
   });
 
-  test("clamps timeout to max 600000ms", () => {
+  test("clamps timeout to max 10 minutes", () => {
     const result = parseCliArgs([
       "node",
       "cli.js",
