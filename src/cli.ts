@@ -19,6 +19,7 @@ import { homedir, tmpdir } from "os";
 const WAIT_POLL_INTERVAL_MS = 1000;
 const WAIT_DEFAULT_TIMEOUT_MIN = 5;
 const WAIT_MAX_TIMEOUT_MS = 600_000;
+const WAIT_MAX_TIMEOUT_MIN = WAIT_MAX_TIMEOUT_MS / 60_000;
 
 // ============================================================
 // Agent directory resolution (mirrors persistence.ts)
@@ -227,7 +228,7 @@ Subcommands:
 
 Options:
   --task, -t <name>   Task name to monitor
-  --timeout <min>     Wait timeout in minutes (default: ${WAIT_DEFAULT_TIMEOUT_MIN}, max: 10). Decimals allowed (e.g. 0.5 = 30 seconds).
+  --timeout <min>     Wait timeout in minutes (default: ${WAIT_DEFAULT_TIMEOUT_MIN}, max: ${WAIT_MAX_TIMEOUT_MIN}). Decimals allowed (e.g. 0.5 = 30 seconds).
   --help, -h          Show this help
 
 Exit codes:

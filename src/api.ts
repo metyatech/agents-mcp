@@ -373,8 +373,10 @@ export async function handleStatus(
       ? `parent_session_id "${normalizedParentSessionId}"`
       : `task "${normalizedTaskName}"`;
 
+  const effectiveTimeoutMin = timeout != null && timeout > 0 ? timeout : WAIT_DEFAULT_TIMEOUT_MIN;
+
   console.error(
-    `[status] Getting status for agents in ${lookupLabel} (filter=${effectiveFilter}${wait ? `, wait=true, timeout=${timeout ?? WAIT_DEFAULT_TIMEOUT_MIN}min` : ""})...`
+    `[status] Getting status for agents in ${lookupLabel} (filter=${effectiveFilter}${wait ? `, wait=true, timeout=${effectiveTimeoutMin}min` : ""})...`
   );
 
   let result = await collectStatus(
@@ -386,10 +388,7 @@ export async function handleStatus(
   );
 
   if (wait && result.summary.running > 0) {
-    const effectiveTimeoutMs = Math.min(
-      (timeout != null && timeout > 0 ? timeout : WAIT_DEFAULT_TIMEOUT_MIN) * 60_000,
-      WAIT_MAX_TIMEOUT_MS
-    );
+    const effectiveTimeoutMs = Math.min(effectiveTimeoutMin * 60_000, WAIT_MAX_TIMEOUT_MS);
     const deadline = Date.now() + effectiveTimeoutMs;
 
     console.error(`[status] Waiting for running agents (deadline in ${effectiveTimeoutMs}ms)...`);
