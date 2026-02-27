@@ -57,6 +57,11 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/autonomous-operations.md
 - Investigate unclear items before proceeding; no assumptions without approval. Make scope/risk/cost/irreversibility decisions explicit.
 - Prefer async control channels (GitHub Issues/PR comments). Design high-volume workflows with queuing and throttling.
 
+## PR review response protocol
+
+- After addressing PR review feedback, resolve the corresponding conversation thread.
+- After all feedback is addressed, re-request review from the agent or person who raised it.
+
 ## GitHub notifications
 
 - After addressing a notification, mark as done via GraphQL `markNotificationsAsDone`. Detailed procedures in the `manager` skill.
@@ -172,7 +177,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/model-inventory.md
 - Before spawning sub-agents, run `ai-quota` to check availability.
 - Always explicitly specify `model` and `effort` from the model inventory when spawning agents; never rely on defaults.
 - The full model inventory with agent tables, routing principles, and quota fallback logic is maintained in the `manager` skill.
-- **Orchestrator model**: When spawning an orchestrator (manager/autonomous-orchestrator role), default to `claude-sonnet-4-6`; use Opus only when the task explicitly requires maximum reasoning depth. Sonnet has an independent quota pool and is ~3× faster, making it the preferred choice for coordination and delegation work.
+- **Orchestrator model**: When spawning an orchestrator (manager/autonomous-orchestrator role), default to `claude-sonnet-4-6` with `medium` effort; use `claude-opus-4-6` with `high` effort when strict rule compliance is required or the task requires maximum reasoning depth. Sonnet is ~3× faster and uses an independent quota pool; Opus is mandatory when rule adherence failures occur.
 - **Gemini sub-agent reliability**: Do NOT use Gemini (`gemini` agent type) for sub-agent delegation. Even single Gemini agents hit 429 "No capacity available" server errors frequently, making them unreliable for unattended tasks. Use Claude or Copilot instead. Gemini CLI may be used interactively by the user but not as a spawned sub-agent.
 
 Source: github:metyatech/agent-rules@HEAD/rules/global/multi-agent-delegation.md
