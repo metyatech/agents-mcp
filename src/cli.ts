@@ -4,7 +4,7 @@
  *
  * Subcommands:
  *   status  --task <name>                Instant status check, returns immediately
- *   wait    --task <name> [--timeout ms] Poll until all agents complete or timeout
+ *   wait    --task <name> [--timeout min] Poll until all agents complete or timeout
  *
  * Default (no subcommand): starts the MCP server (original behavior).
  *
@@ -17,8 +17,9 @@ import { fileURLToPath } from "url";
 import { homedir, tmpdir } from "os";
 
 const WAIT_POLL_INTERVAL_MS = 1000;
-const WAIT_DEFAULT_TIMEOUT_MS = 300_000;
+const WAIT_DEFAULT_TIMEOUT_MIN = 5;
 const WAIT_MAX_TIMEOUT_MS = 600_000;
+const WAIT_MAX_TIMEOUT_MIN = WAIT_MAX_TIMEOUT_MS / 60_000;
 
 // ============================================================
 // Agent directory resolution (mirrors persistence.ts)
@@ -191,7 +192,7 @@ export function parseCliArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2); // skip node + script path
   let subcommand: string | null = null;
   let taskName: string | null = null;
-  let timeout = WAIT_DEFAULT_TIMEOUT_MS;
+  let timeout = WAIT_DEFAULT_TIMEOUT_MIN * 60_000;
   let help = false;
 
   let i = 0;
@@ -205,8 +206,8 @@ export function parseCliArgs(argv: string[]): ParsedArgs {
     if ((arg === "--task" || arg === "-t") && i + 1 < args.length) {
       taskName = args[++i];
     } else if (arg === "--timeout" && i + 1 < args.length) {
-      const ms = parseInt(args[++i], 10);
-      if (!isNaN(ms) && ms > 0) timeout = Math.min(ms, WAIT_MAX_TIMEOUT_MS);
+      const min = parseFloat(args[++i]);
+      if (!isNaN(min) && min > 0) timeout = Math.min(min * 60_000, WAIT_MAX_TIMEOUT_MS);
     } else if (arg === "--help" || arg === "-h") {
       help = true;
     }
@@ -227,7 +228,7 @@ Subcommands:
 
 Options:
   --task, -t <name>   Task name to monitor
-  --timeout <ms>      Wait timeout in ms (default: ${WAIT_DEFAULT_TIMEOUT_MS}, max: ${WAIT_MAX_TIMEOUT_MS})
+  --timeout <min>     Wait timeout in minutes (default: ${WAIT_DEFAULT_TIMEOUT_MIN}, max: ${WAIT_MAX_TIMEOUT_MIN}). Decimals allowed (e.g. 0.5 = 30 seconds).
   --help, -h          Show this help
 
 Exit codes:
@@ -253,7 +254,7 @@ export async function runStatusCommand(
 
 export async function runWaitCommand(
   taskName: string,
-  timeout: number = WAIT_DEFAULT_TIMEOUT_MS,
+  timeout: number = WAIT_DEFAULT_TIMEOUT_MIN * 60_000,
   agentsDir?: string
 ): Promise<TaskStatusOutput> {
   const effectiveTimeout = Math.min(timeout, WAIT_MAX_TIMEOUT_MS);
@@ -306,8 +307,9 @@ async function main(): Promise<void> {
       process.stdout.write(JSON.stringify(result, null, 2) + "\n");
       process.exit(result.agents.length === 0 ? 2 : 0);
     } else {
+      const effectiveTimeoutMs = Math.min(timeout, WAIT_MAX_TIMEOUT_MS);
       process.stderr.write(
-        `[agents-mcp] Waiting for task "${taskName}" (timeout: ${timeout}ms)...\n`
+        `[agents-mcp] Waiting for task "${taskName}" (timeout: ${effectiveTimeoutMs / 60_000}min)...\n`
       );
       const result = await runWaitCommand(taskName, timeout);
       process.stdout.write(JSON.stringify(result, null, 2) + "\n");

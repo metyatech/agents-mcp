@@ -1356,14 +1356,14 @@ Write a summary of completed tasks.
         undefined,
         null,
         true,
-        5000
+        0.1
       );
       const elapsed = Date.now() - before;
 
       expect(result.summary.running).toBe(0);
       expect(result.summary.completed).toBe(1);
       expect(result.timed_out).toBeUndefined();
-      // Should return almost immediately (well under the 5s timeout)
+      // Should return almost immediately (well under the 0.1min timeout)
       expect(elapsed).toBeLessThan(2000);
     });
 
@@ -1414,7 +1414,7 @@ Write a summary of completed tasks.
         undefined,
         null,
         true,
-        2000
+        2 / 60 // 2 seconds (2/60 * 60000 = 2000ms)
       );
       const elapsed = Date.now() - before;
 
@@ -1425,8 +1425,8 @@ Write a summary of completed tasks.
       expect(elapsed).toBeLessThan(5000);
     });
 
-    test("should clamp timeout to max 600000ms", async () => {
-      console.log("\n--- TEST: timeout clamped to 600000ms ---");
+    test("should clamp timeout to max 10 minutes", async () => {
+      console.log("\n--- TEST: timeout clamped to 10 minutes ---");
 
       // We can't actually wait 10+ minutes, but we verify the agent completes
       // before timeout so we just test that huge values don't cause issues
@@ -1449,7 +1449,66 @@ Write a summary of completed tasks.
         undefined,
         null,
         true,
-        999999999
+        1000
+      );
+
+      expect(result.summary.running).toBe(0);
+      expect(result.timed_out).toBeUndefined();
+    });
+
+    test("should treat negative timeout as default and wait normally", async () => {
+      console.log("\n--- TEST: negative timeout falls back to default ---");
+
+      const agent = new AgentProcess(
+        "wait-neg-1",
+        "wait-task-neg",
+        "codex",
+        "Work",
+        null,
+        "plan",
+        null,
+        AgentStatus.COMPLETED
+      );
+      manager["agents"].set("wait-neg-1", agent);
+
+      // Negative timeout should fall back to WAIT_DEFAULT_TIMEOUT_MIN (not expire immediately)
+      const result = await handleStatus(
+        manager,
+        "wait-task-neg",
+        undefined,
+        undefined,
+        null,
+        true,
+        -1
+      );
+
+      expect(result.summary.running).toBe(0);
+      expect(result.timed_out).toBeUndefined();
+    });
+
+    test("should treat zero timeout as default and wait normally", async () => {
+      console.log("\n--- TEST: zero timeout falls back to default ---");
+
+      const agent = new AgentProcess(
+        "wait-zero-1",
+        "wait-task-zero",
+        "codex",
+        "Work",
+        null,
+        "plan",
+        null,
+        AgentStatus.COMPLETED
+      );
+      manager["agents"].set("wait-zero-1", agent);
+
+      const result = await handleStatus(
+        manager,
+        "wait-task-zero",
+        undefined,
+        undefined,
+        null,
+        true,
+        0
       );
 
       expect(result.summary.running).toBe(0);
@@ -1485,7 +1544,7 @@ Write a summary of completed tasks.
         undefined,
         null,
         true,
-        10000
+        0.2
       );
       const elapsed = Date.now() - before;
 

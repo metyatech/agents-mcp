@@ -1,7 +1,6 @@
 import { pathToFileURL } from "url";
-export function printHelloWorld() {
-    console.log("hello world");
-}
+import { printHelloWorld } from "./hello.js";
+export { printHelloWorld };
 const invokedPath = process.argv[1];
 if (invokedPath) {
     const invokedFileUrl = pathToFileURL(invokedPath).href;

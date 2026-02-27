@@ -1,6 +1,7 @@
 import { pathToFileURL } from "url";
+export const HELLO_WORLD_MESSAGE = "Hello, World!";
 export function printHelloWorld() {
-    console.log("hello world");
+    console.log(HELLO_WORLD_MESSAGE);
 }
 const invokedPath = process.argv[1];
 if (invokedPath) {
