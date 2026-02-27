@@ -1414,7 +1414,7 @@ Write a summary of completed tasks.
         undefined,
         null,
         true,
-        0.033 // ~2 seconds (0.033 * 60000 = 1980ms)
+        2 / 60 // 2 seconds (2/60 * 60000 = 2000ms)
       );
       const elapsed = Date.now() - before;
 

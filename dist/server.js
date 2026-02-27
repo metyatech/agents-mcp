@@ -184,7 +184,7 @@ BLOCKING vs NON-BLOCKING: When wait=true, this tool blocks until agents complete
                         },
                         timeout: {
                             type: "number",
-                            description: "Max wait time in minutes when wait=true. Defaults to 1 (1 minute). Max 10 (10 minutes). Decimals allowed (e.g. 0.5 = 30 seconds)."
+                            description: "Max wait time in minutes when wait=true. Defaults to 5 (5 minutes). Max 10 (10 minutes). Decimals allowed (e.g. 0.5 = 30 seconds)."
                         }
                     },
                     required: ["task_name"]

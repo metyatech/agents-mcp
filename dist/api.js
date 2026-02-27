@@ -193,7 +193,7 @@ async function collectStatus(manager, normalizedTaskName, normalizedParentSessio
     };
 }
 const WAIT_POLL_INTERVAL_MS = 1000;
-const WAIT_DEFAULT_TIMEOUT_MIN = 1;
+const WAIT_DEFAULT_TIMEOUT_MIN = 5;
 const WAIT_MAX_TIMEOUT_MS = 600_000;
 export async function handleStatus(manager, taskName, filter, since, // Optional ISO timestamp - return only events after this time
 parentSessionId, wait, timeout) {

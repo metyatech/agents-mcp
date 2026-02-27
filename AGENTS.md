@@ -18,7 +18,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/agent-rules-composition.m
 
 - AGENTS.md is self-contained; place at project root. Shared rules centrally; project-local only for truly local policies.
 - Before work in a repo with `agent-ruleset.json`, run `compose-agentsmd` to refresh AGENTS.md.
-- Pre-commit hooks run `compose-agentsmd --compose` and auto-stage. Do not fail commits on drift or add freshness checks to CI.
+- Pre-commit hooks must run the repo's full verification suite, then `compose-agentsmd --compose`, then `git add AGENTS.md`. Do not fail commits on drift or add freshness checks to CI.
 
 ## Update and editing
 
@@ -51,7 +51,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/autonomous-operations.md
 - Self-evaluate continuously; fix rule/skill gaps immediately on discovery. In delegated mode, include improvement suggestions in the task result.
 - On user-reported failures: treat as systemic — fix, update rules, check for same pattern elsewhere, in one action.
 - Persistent workflow promises → propose rule update immediately (blocking gate). In delegated mode, follow that module's restricted-operations guidance.
-- Session memory resets; use rule files as persistent memory. Always reference current AGENTS.md, never from memory.
+- Session memory resets; use rule files as persistent memory. Always reference current AGENTS.md, never from memory. Never write to platform-specific local memory files (e.g., Claude Code auto-memory); all persistent behavioral knowledge MUST live in agent rules to ensure consistency across all environments, operating systems, and agent platforms.
 - Rules are source of truth; update conflicting repos to comply or encode the exception.
 - When the `manager` skill is invoked, maintain that role for the session unless user explicitly stops it.
 - Investigate unclear items before proceeding; no assumptions without approval. Make scope/risk/cost/irreversibility decisions explicit.
@@ -203,6 +203,11 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/multi-agent-delegation.md
 - Do not rapidly switch or respawn sub-agents for the same task while one is actively running without errors.
 - Status checks should prioritize non-blocking monitoring and user responsiveness, but must not be used as justification for premature agent replacement.
 
+## agents-mcp dispatch
+
+- Always set `mode: 'edit'` when spawning implementation agents; default `mode: 'plan'` is read-only and wastes the agent call.
+- `agents-mcp wait` is unreliable (may return before agent completes); use `Status(wait=true, timeout=8)` as the definitive completion check.
+
 Source: github:metyatech/agent-rules@HEAD/rules/global/planning-and-approval-gate.md
 
 # Planning and approval gate
@@ -340,6 +345,8 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/task-lifecycle-tracking.m
 - At the start of any session that may involve state-changing work, run `task-tracker check` and report findings before starting new work.
 - When reporting a task as complete, state the lifecycle stage explicitly (committed/pushed/released/etc.); never claim "done" when downstream stages remain incomplete.
 - If `task-tracker` is not installed, install it via `npm install -g @metyatech/task-tracker` before proceeding.
+- CLI: `task-tracker add "desc"` / `check` / `list` / `done <id>` / `remove <id>` / `update <id> --stage <stage>` — use `--stage`, NOT `--status`.
+- Valid stages: `pending`, `in-progress`, `committed`, `pushed`, `released`, `done`.
 - The task-tracker state file (`.tasks.jsonl`) must be committed to version control; do not add it to `.gitignore`.
 
 Source: github:metyatech/agent-rules@HEAD/rules/global/thread-inbox.md
@@ -351,6 +358,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/thread-inbox.md
 - Store `.threads.jsonl` in the workspace root directory (use `--dir <workspace-root>`). Do not commit it to version control.
 - At session start, run `thread-inbox inbox` and `thread-inbox list --status waiting` to find threads needing attention; report findings before starting new work.
 - Do not create threads for tasks already tracked by `task-tracker`; threads are for context and decisions, not work items.
+- CLI: `thread-inbox new "title" --dir <dir>` (must create before adding messages) / `add <id> --from user|ai "msg" --dir <dir>` / `inbox --dir <dir>` / `list --status <status> --dir <dir>`.
 - If a thread captures a persistent behavioral preference, encode it as a rule and resolve the thread.
 - Detailed usage procedures (status model, when to create/add messages, lifecycle) are in the `manager` skill.
 
