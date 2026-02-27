@@ -26,20 +26,20 @@ async function runScript(
   });
 }
 
-test("hello script prints hello world", async () => {
+test("hello script prints Hello, World!", async () => {
   const repoRoot = path.resolve(__dirname, "..");
   const scriptPath = path.join(repoRoot, "src", "hello.ts");
   const { exitCode, stdout, stderr } = await runScript(scriptPath);
   expect(exitCode).toBe(0);
   expect(stderr.trim()).toBe("");
-  expect(stdout.trim()).toBe("hello world");
+  expect(stdout.trim()).toBe("Hello, World!");
 });
 
-test("hello-world script prints hello world once", async () => {
+test("hello-world script prints Hello, World! once", async () => {
   const repoRoot = path.resolve(__dirname, "..");
   const scriptPath = path.join(repoRoot, "src", "hello-world.ts");
   const { exitCode, stdout, stderr } = await runScript(scriptPath);
   expect(exitCode).toBe(0);
   expect(stderr.trim()).toBe("");
-  expect(stdout.trim()).toBe("hello world");
+  expect(stdout.trim()).toBe("Hello, World!");
 });

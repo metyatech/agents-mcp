@@ -5,7 +5,7 @@ import { spawn } from "child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-test("examples hello-world prints hello world", async () => {
+test("examples hello-world prints Hello, World!", async () => {
   const workspaceRoot = path.resolve(__dirname, "..");
   const scriptPath = path.join(workspaceRoot, "examples", "hello-world.ts");
   const tsxBin = path.join(__dirname, "..", "node_modules", ".bin", "tsx");
@@ -24,7 +24,7 @@ test("examples hello-world prints hello world", async () => {
     });
     proc.on("close", (code) => {
       expect(stderr.trim()).toBe("");
-      expect(stdout.trim()).toBe("hello world");
+      expect(stdout.trim()).toBe("Hello, World!");
       resolve(code ?? 1);
     });
   });
