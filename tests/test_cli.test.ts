@@ -365,16 +365,53 @@ describe("runWaitCommand", () => {
     await fs.rm(agentsDir, { recursive: true, force: true });
   });
 
-  test("returns immediately when no agents are running", async () => {
+  test("waits until timeout when no agents exist", async () => {
+    const timeoutMs = 2000;
     const before = Date.now();
-    const result = await runWaitCommand("empty-task", 5000, agentsDir);
+    const result = await runWaitCommand("empty-task", timeoutMs, agentsDir);
     const elapsed = Date.now() - before;
 
     expect(result.task_name).toBe("empty-task");
-    expect(result.timed_out).toBe(false);
+    // No agents ever appeared, so timed_out is false (no running agents at exit)
+    // but the wait should have polled until the deadline
+    expect(result.agents).toEqual([]);
     expect(result.summary.running).toBe(0);
-    expect(elapsed).toBeLessThan(500);
-  });
+    // Must have waited at least close to the timeout, not returned instantly
+    expect(elapsed).toBeGreaterThanOrEqual(timeoutMs - 200);
+  }, 10_000);
+
+  test("discovers agents that appear during wait", async () => {
+    // Start wait with no agents, then write a completed agent after a delay
+    const timeoutMs = 10_000;
+    const delayMs = 1500;
+
+    // Write a completed agent after delayMs
+    const writeTimer = setTimeout(async () => {
+      await writeMetaJson(
+        agentsDir,
+        "late-agent",
+        makeMeta({
+          agent_id: "late-agent",
+          task_name: "late-task",
+          status: "completed"
+        })
+      );
+    }, delayMs);
+
+    const before = Date.now();
+    const result = await runWaitCommand("late-task", timeoutMs, agentsDir);
+    const elapsed = Date.now() - before;
+    clearTimeout(writeTimer);
+
+    expect(result.timed_out).toBe(false);
+    expect(result.agents).toHaveLength(1);
+    expect(result.agents[0].agent_id).toBe("late-agent");
+    expect(result.summary.completed).toBe(1);
+    // Should have waited at least until the agent appeared
+    expect(elapsed).toBeGreaterThanOrEqual(delayMs - 200);
+    // But not the full timeout
+    expect(elapsed).toBeLessThan(timeoutMs - 1000);
+  }, 15_000);
 
   test("returns immediately when all agents are already completed", async () => {
     await writeMetaJson(

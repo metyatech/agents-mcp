@@ -193,7 +193,7 @@ export async function runWaitCommand(taskName, timeout = WAIT_DEFAULT_TIMEOUT_MI
     const deadline = Date.now() + effectiveTimeout;
     let agents = await getTaskAgents(taskName, agentsDir);
     let summary = sumStatusCounts(agents);
-    while (summary.running > 0 && Date.now() < deadline) {
+    while ((summary.running > 0 || agents.length === 0) && Date.now() < deadline) {
         await new Promise((resolve) => setTimeout(resolve, WAIT_POLL_INTERVAL_MS));
         agents = await getTaskAgents(taskName, agentsDir);
         summary = sumStatusCounts(agents);

@@ -391,12 +391,25 @@ export async function handleStatus(
     since
   );
 
-  if (wait && result.summary.running > 0) {
+  const totalAgentCount =
+    result.summary.running +
+    result.summary.completed +
+    result.summary.failed +
+    result.summary.stopped;
+  if (wait && (result.summary.running > 0 || totalAgentCount === 0)) {
     const deadline = Date.now() + effectiveTimeoutMs;
 
     console.error(`[status] Waiting for running agents (deadline in ${effectiveTimeoutMs}ms)...`);
 
-    while (result.summary.running > 0 && Date.now() < deadline) {
+    while (
+      (result.summary.running > 0 ||
+        result.summary.running +
+          result.summary.completed +
+          result.summary.failed +
+          result.summary.stopped ===
+          0) &&
+      Date.now() < deadline
+    ) {
       await new Promise((resolve) => setTimeout(resolve, WAIT_POLL_INTERVAL_MS));
       result = await collectStatus(
         manager,

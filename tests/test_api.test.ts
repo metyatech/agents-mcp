@@ -1456,6 +1456,30 @@ Write a summary of completed tasks.
       expect(result.timed_out).toBeUndefined();
     });
 
+    test("should wait for agents to appear when wait=true and no agents exist", async () => {
+      console.log("\n--- TEST: wait=true, no agents exist yet ---");
+
+      const before = Date.now();
+      const result = await handleStatus(
+        manager,
+        "wait-task-empty",
+        undefined,
+        undefined,
+        null,
+        true,
+        2 / 60 // 2 seconds
+      );
+      const elapsed = Date.now() - before;
+
+      // No agents ever appeared, so counts are all zero
+      expect(result.summary.running).toBe(0);
+      expect(result.summary.completed).toBe(0);
+      expect(result.agents).toHaveLength(0);
+      // Should have waited approximately 2s (not returned immediately)
+      expect(elapsed).toBeGreaterThanOrEqual(1500);
+      expect(elapsed).toBeLessThan(5000);
+    });
+
     test("should treat negative timeout as default and wait normally", async () => {
       console.log("\n--- TEST: negative timeout falls back to default ---");
 
