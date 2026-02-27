@@ -210,7 +210,7 @@ parentSessionId, wait, timeout) {
     console.error(`[status] Getting status for agents in ${lookupLabel} (filter=${effectiveFilter}${wait ? `, wait=true, timeout=${timeout ?? WAIT_DEFAULT_TIMEOUT_MIN}min` : ""})...`);
     let result = await collectStatus(manager, normalizedTaskName, normalizedParentSessionId, effectiveFilter, since);
     if (wait && result.summary.running > 0) {
-        const effectiveTimeoutMs = Math.min((timeout ?? WAIT_DEFAULT_TIMEOUT_MIN) * 60_000, WAIT_MAX_TIMEOUT_MS);
+        const effectiveTimeoutMs = Math.min((timeout != null && timeout > 0 ? timeout : WAIT_DEFAULT_TIMEOUT_MIN) * 60_000, WAIT_MAX_TIMEOUT_MS);
         const deadline = Date.now() + effectiveTimeoutMs;
         console.error(`[status] Waiting for running agents (deadline in ${effectiveTimeoutMs}ms)...`);
         while (result.summary.running > 0 && Date.now() < deadline) {

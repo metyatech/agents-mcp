@@ -4,7 +4,7 @@
  *
  * Subcommands:
  *   status  --task <name>                Instant status check, returns immediately
- *   wait    --task <name> [--timeout ms] Poll until all agents complete or timeout
+ *   wait    --task <name> [--timeout min] Poll until all agents complete or timeout
  *
  * Default (no subcommand): starts the MCP server (original behavior).
  *

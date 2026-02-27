@@ -474,6 +474,16 @@ describe("parseCliArgs", () => {
     expect(result.timeout).toBe(600_000);
   });
 
+  test("ignores negative timeout and keeps default", () => {
+    const result = parseCliArgs(["node", "cli.js", "wait", "--task", "t", "--timeout", "-5"]);
+    expect(result.timeout).toBe(300_000);
+  });
+
+  test("ignores zero timeout and keeps default", () => {
+    const result = parseCliArgs(["node", "cli.js", "wait", "--task", "t", "--timeout", "0"]);
+    expect(result.timeout).toBe(300_000);
+  });
+
   test("sets default timeout when not specified", () => {
     const result = parseCliArgs(["node", "cli.js", "wait", "--task", "t"]);
     expect(result.timeout).toBe(300_000);

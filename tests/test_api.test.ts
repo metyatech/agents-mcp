@@ -1456,6 +1456,65 @@ Write a summary of completed tasks.
       expect(result.timed_out).toBeUndefined();
     });
 
+    test("should treat negative timeout as default and wait normally", async () => {
+      console.log("\n--- TEST: negative timeout falls back to default ---");
+
+      const agent = new AgentProcess(
+        "wait-neg-1",
+        "wait-task-neg",
+        "codex",
+        "Work",
+        null,
+        "plan",
+        null,
+        AgentStatus.COMPLETED
+      );
+      manager["agents"].set("wait-neg-1", agent);
+
+      // Negative timeout should fall back to WAIT_DEFAULT_TIMEOUT_MIN (not expire immediately)
+      const result = await handleStatus(
+        manager,
+        "wait-task-neg",
+        undefined,
+        undefined,
+        null,
+        true,
+        -1
+      );
+
+      expect(result.summary.running).toBe(0);
+      expect(result.timed_out).toBeUndefined();
+    });
+
+    test("should treat zero timeout as default and wait normally", async () => {
+      console.log("\n--- TEST: zero timeout falls back to default ---");
+
+      const agent = new AgentProcess(
+        "wait-zero-1",
+        "wait-task-zero",
+        "codex",
+        "Work",
+        null,
+        "plan",
+        null,
+        AgentStatus.COMPLETED
+      );
+      manager["agents"].set("wait-zero-1", agent);
+
+      const result = await handleStatus(
+        manager,
+        "wait-task-zero",
+        undefined,
+        undefined,
+        null,
+        true,
+        0
+      );
+
+      expect(result.summary.running).toBe(0);
+      expect(result.timed_out).toBeUndefined();
+    });
+
     test("should return when running agent completes during wait", async () => {
       console.log("\n--- TEST: wait=true, agent completes during wait ---");
 
