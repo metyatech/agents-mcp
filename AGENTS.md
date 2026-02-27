@@ -211,7 +211,7 @@ Source: github:metyatech/agent-rules@HEAD/rules/global/multi-agent-delegation.md
 ## agents-mcp dispatch
 
 - Always set `mode: 'edit'` when spawning implementation agents; default `mode: 'plan'` is read-only and wastes the agent call.
-- `agents-mcp wait` is unreliable (may return before agent completes); use `Status(wait=true, timeout=8)` as the definitive completion check.
+- `agents-mcp wait` is unreliable (may return before agent completes); use `Status(wait=true, timeout=8min)` (a timeout of 8 minutes) as the definitive completion check.
 
 Source: github:metyatech/agent-rules@HEAD/rules/global/planning-and-approval-gate.md
 
