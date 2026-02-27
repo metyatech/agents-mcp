@@ -307,8 +307,9 @@ async function main(): Promise<void> {
       process.stdout.write(JSON.stringify(result, null, 2) + "\n");
       process.exit(result.agents.length === 0 ? 2 : 0);
     } else {
+      const effectiveTimeoutMs = Math.min(timeout, WAIT_MAX_TIMEOUT_MS);
       process.stderr.write(
-        `[agents-mcp] Waiting for task "${taskName}" (timeout: ${timeout / 60_000}min)...\n`
+        `[agents-mcp] Waiting for task "${taskName}" (timeout: ${effectiveTimeoutMs / 60_000}min)...\n`
       );
       const result = await runWaitCommand(taskName, timeout);
       process.stdout.write(JSON.stringify(result, null, 2) + "\n");
