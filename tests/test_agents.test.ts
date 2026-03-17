@@ -1263,6 +1263,74 @@ describe("Config-driven buildCommand", () => {
   });
 });
 
+describe("Codex flag-conflict regression: --dangerously-bypass-approvals-and-sandbox vs --full-auto", () => {
+  let testDir: string;
+  let manager: AgentManager;
+
+  beforeEach(async () => {
+    testDir = path.join(tmpdir(), `codex_flag_conflict_${Date.now()}`);
+    await fs.mkdir(testDir, { recursive: true });
+    manager = new AgentManager(5, 10, testDir);
+    await manager["initialize"]();
+    manager["agents"].clear();
+  });
+
+  afterEach(async () => {
+    try {
+      await fs.rm(testDir, { recursive: true });
+    } catch {}
+  });
+
+  test("codex edit mode: has --dangerously-bypass-approvals-and-sandbox, not --full-auto", () => {
+    // Default config uses --sandbox danger-full-access; edit mode must add
+    // --dangerously-bypass-approvals-and-sandbox and must NOT add --full-auto.
+    const cmd = manager["buildCommand"]("codex", "fix the bug", "edit", "gpt-5.3-codex");
+    expect(cmd).toContain("--dangerously-bypass-approvals-and-sandbox");
+    expect(cmd).not.toContain("--full-auto");
+  });
+
+  test("codex ralph mode: has --full-auto, not --dangerously-bypass-approvals-and-sandbox", () => {
+    // Default config uses --sandbox danger-full-access; ralph mode must add
+    // --full-auto and must NOT carry --dangerously-bypass-approvals-and-sandbox.
+    const cmd = manager["buildCommand"]("codex", "fix the bug", "ralph", "gpt-5.3-codex");
+    expect(cmd).toContain("--full-auto");
+    expect(cmd).not.toContain("--dangerously-bypass-approvals-and-sandbox");
+  });
+
+  test("codex ralph mode with AGENT_COMMANDS base: strips --dangerously-bypass-approvals-and-sandbox", () => {
+    // Simulate a custom config that embeds --dangerously-bypass-approvals-and-sandbox in the template.
+    // Ralph mode must strip it before adding --full-auto (they are mutually exclusive in codex).
+    manager["agentConfigs"] = {
+      ...manager["agentConfigs"],
+      codex: {
+        ...manager["agentConfigs"].codex,
+        command: "codex exec --dangerously-bypass-approvals-and-sandbox '{prompt}' --json"
+      }
+    };
+    const cmd = manager["buildCommand"]("codex", "fix the bug", "ralph", "gpt-5.3-codex");
+    expect(cmd).toContain("--full-auto");
+    expect(cmd).not.toContain("--dangerously-bypass-approvals-and-sandbox");
+    // No duplicate --full-auto
+    expect(cmd.filter((a) => a === "--full-auto").length).toBe(1);
+  });
+
+  test("codex edit mode with AGENT_COMMANDS base: deduplicates --dangerously-bypass-approvals-and-sandbox", () => {
+    // When the base template already has --dangerously-bypass-approvals-and-sandbox,
+    // edit mode must not duplicate it.
+    manager["agentConfigs"] = {
+      ...manager["agentConfigs"],
+      codex: {
+        ...manager["agentConfigs"].codex,
+        command: "codex exec --dangerously-bypass-approvals-and-sandbox '{prompt}' --json"
+      }
+    };
+    const cmd = manager["buildCommand"]("codex", "fix the bug", "edit", "gpt-5.3-codex");
+    expect(cmd).toContain("--dangerously-bypass-approvals-and-sandbox");
+    expect(cmd.filter((a) => a === "--dangerously-bypass-approvals-and-sandbox").length).toBe(1);
+    expect(cmd).not.toContain("--full-auto");
+  });
+});
+
 describe("buildReplyCommand", () => {
   let testDir: string;
   let manager: AgentManager;

@@ -1163,7 +1163,15 @@ export class AgentManager {
         const ralphCmd = [...cmd];
         switch (agentType) {
             case "codex":
-                ralphCmd.push("--full-auto");
+                // --dangerously-bypass-approvals-and-sandbox is incompatible with --full-auto;
+                // strip it before enabling full-auto mode.
+                {
+                    const dbaIdx = ralphCmd.indexOf("--dangerously-bypass-approvals-and-sandbox");
+                    if (dbaIdx !== -1)
+                        ralphCmd.splice(dbaIdx, 1);
+                }
+                if (!ralphCmd.includes("--full-auto"))
+                    ralphCmd.push("--full-auto");
                 break;
             case "cursor":
                 ralphCmd.push("-f");
