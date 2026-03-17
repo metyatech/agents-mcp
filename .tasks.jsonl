@@ -20,4 +20,4 @@
 {"id":"7Hxuwpd7","description":"Write hello world implementation","stage":"done","createdAt":"2026-02-27T11:58:32.529Z","updatedAt":"2026-02-27T12:01:10.152Z"}
 {"id":"h8BWxETb","description":"Write hello world","stage":"done","createdAt":"2026-02-27T12:02:24.739Z","updatedAt":"2026-02-27T12:06:14.402Z"}
 {"id":"aCfjZyRf","description":"Write hello world implementation and summarize changes","stage":"done","createdAt":"2026-02-27T12:05:04.352Z","updatedAt":"2026-02-27T12:06:57.028Z"}
-{"id":"eRzKLdhi","description":"Fix Codex flag conflict in agents-mcp and update agent-dotfiles to reference the new latest agents-mcp build","stage":"in-progress","createdAt":"2026-03-17T01:33:46.392Z","updatedAt":"2026-03-17T01:50:08.098Z"}
+{"id":"eRzKLdhi","description":"Fix Codex flag conflict in agents-mcp and update agent-dotfiles to reference the new latest agents-mcp build","stage":"released","createdAt":"2026-03-17T01:33:46.392Z","updatedAt":"2026-03-17T02:20:22.962Z"}
